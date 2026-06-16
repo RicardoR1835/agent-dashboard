@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OverCoffee — Agent Dashboard</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F7F6F3;--surface:#FFF;--surface2:#F0EEE9;--border:#E2DED7;--border-strong:#C8C3BA;
+  --text:#1A1916;--muted:#6B6760;--faint:#9E9A94;
+  --accent:#2E5BFF;--accent-bg:#EBF0FF;
+  --green:#1A7A4A;--green-bg:#E6F4ED;
+  --amber:#A05E00;--amber-bg:#FEF3E2;
+  --red:#C0392B;--red-bg:#FDECEA;
+  --purple:#5B3FBF;--purple-bg:#EDE9FF;
+  --teal:#0F6E56;--teal-bg:#E1F4EE;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --r:8px;--rl:12px;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5}
+.shell{display:flex;height:100vh;overflow:hidden}
+/* Sidebar */
+.sidebar{width:252px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.sb-head{padding:18px 16px 14px;border-bottom:1px solid var(--border)}
+.sb-logo{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+.sb-title{font-size:16px;font-weight:700;color:var(--text);letter-spacing:-.3px}
+.sb-sec{padding:12px 16px 6px;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.fb{display:flex;align-items:center;gap:8px;width:100%;padding:6px 16px;background:none;border:none;cursor:pointer;font-family:var(--font);font-size:13px;color:var(--muted);text-align:left;transition:background .1s}
+.fb:hover{background:var(--surface2)}
+.fb.active{background:var(--accent-bg);color:var(--accent);font-weight:500}
+.fb .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.fb .ct{margin-left:auto;font-size:11px;background:var(--surface2);color:var(--faint);padding:1px 6px;border-radius:10px}
+.fb.active .ct{background:var(--accent-bg);color:var(--accent)}
+.sb-stats{margin-top:auto;padding:12px 16px;border-top:1px solid var(--border)}
+.sr{display:flex;justify-content:space-between;align-items:center;padding:3px 0}
+.sl{font-size:12px;color:var(--muted)}.sv{font-size:12px;font-weight:600}
+/* Main */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.tb-title{font-size:15px;font-weight:600;flex:1}
+.sw input{padding:7px 10px 7px 30px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface2);font-family:var(--font);font-size:13px;color:var(--text);width:200px;outline:none;transition:border-color .15s}
+.sw input:focus{border-color:var(--accent);background:#fff}
+.sw{position:relative}
+.si{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--faint);font-size:12px;pointer-events:none}
+.sync-btn,.run-all-btn{display:flex;align-items:center;gap:5px;padding:7px 13px;border-radius:var(--r);font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;border:none;white-space:nowrap;transition:opacity .15s}
+.sync-btn{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+.sync-btn:hover{border-color:var(--border-strong)}
+.run-all-btn{background:var(--accent);color:#fff}
+.run-all-btn:hover{opacity:.88}
+.run-all-btn:disabled{opacity:.45;cursor:not-allowed}
+.content{flex:1;overflow-y:auto;padding:20px}
+/* Status bar */
+.status-bar{display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);font-size:12px;color:var(--muted)}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex-shrink:0}
+.status-dot.live{background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.status-bar .spacer{flex:1}
+/* Section header */
+.sec-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.sec-label{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
+.sec-count{font-size:12px;color:var(--muted)}
+/* Cards */
+.task-grid{display:flex;flex-direction:column;gap:9px}
+.task-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;transition:border-color .15s,box-shadow .15s}
+.task-card:hover{border-color:var(--border-strong);box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.task-card.running{border-color:var(--accent)}
+.task-card.completed{border-color:var(--green);opacity:.78}
+.card-hd{display:flex;align-items:flex-start;gap:10px;padding:13px 14px 10px}
+.card-meta{flex:1;min-width:0}
+.card-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:5px;line-height:1.35}
+.card-tags{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.tag{font-size:11px;font-weight:500;padding:2px 7px;border-radius:4px;white-space:nowrap}
+.tc-TCC{background:var(--purple-bg);color:var(--purple)}
+.tc-HS{background:var(--teal-bg);color:var(--teal)}
+.tc-GT4{background:var(--amber-bg);color:var(--amber)}
+.tc-Cody{background:var(--green-bg);color:var(--green)}
+.tt-SEO{background:#E6F4FF;color:#1A5FAB}
+.tt-EMAIL{background:#FFF0F6;color:#8B225A}
+.tt-CONTENT{background:var(--green-bg);color:var(--green)}
+.tt-OPS{background:var(--surface2);color:var(--muted)}
+.tt-PAID{background:var(--amber-bg);color:var(--amber)}
+.tp-High{background:var(--red-bg);color:var(--red)}
+.tp-Medium{background:var(--amber-bg);color:var(--amber)}
+.tp-Low{background:var(--surface2);color:var(--muted)}
+.ts-done{background:var(--green-bg);color:var(--green)}
+.ts-prog{background:var(--accent-bg);color:var(--accent)}
+.card-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.card-week{font-size:11px;color:var(--faint);white-space:nowrap}
+.notion-link{font-size:11px;color:var(--faint);text-decoration:none;display:flex;align-items:center;gap:2px}
+.notion-link:hover{color:var(--accent)}
+.run-btn{display:flex;align-items:center;gap:4px;padding:6px 11px;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent);border-radius:var(--r);font-family:var(--font);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap}
+.run-btn:hover{background:var(--accent);color:#fff}
+.run-btn:disabled{opacity:.38;cursor:not-allowed;pointer-events:none}
+.done-badge{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;color:var(--green)}
+.card-summary{padding:0 14px 11px;font-size:13px;color:var(--muted);line-height:1.55}
+/* Progress */
+.prog-wrap{height:2px;background:var(--border);margin:0 14px 12px;border-radius:2px;overflow:hidden;display:none}
+.prog-wrap.on{display:block}
+.prog-bar{height:100%;background:var(--accent);border-radius:2px;width:0%;transition:width .35s ease}
+/* Output panel */
+.out-panel{margin:0 14px 13px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;display:none}
+.out-panel.on{display:block}
+.out-hd{display:flex;align-items:center;gap:7px;padding:7px 11px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:12px;font-weight:500;color:var(--muted)}
+.out-body{padding:12px;font-size:13px;line-height:1.65;color:var(--text);max-height:400px;overflow-y:auto;white-space:pre-wrap;word-break:break-word}
+.out-body h3{font-size:13px;font-weight:600;margin:10px 0 4px;color:var(--text)}
+.out-body p{margin-bottom:8px}
+.out-body ul{padding-left:18px;margin-bottom:8px}
+.out-body li{margin-bottom:3px}
+.out-body strong{font-weight:600}
+.out-actions{display:flex;gap:8px;padding:8px 11px;border-top:1px solid var(--border);background:var(--surface2)}
+.copy-btn,.notion-save-btn{padding:5px 10px;border-radius:6px;font-family:var(--font);font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--muted);transition:all .12s}
+.copy-btn:hover{border-color:var(--border-strong);color:var(--text)}
+.notion-save-btn{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
+.notion-save-btn:hover{background:var(--accent);color:#fff}
+/* Spinner */
+.spin{width:13px;height:13px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* Loading / empty */
+.loading-state,.empty-state{text-align:center;padding:56px 20px;color:var(--muted)}
+.loading-state .spin{width:24px;height:24px;border-width:3px;margin:0 auto 14px}
+.empty-state h3{font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px}
+/* Scrollbars */
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:10px}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<aside class="sidebar">
+  <div class="sb-head">
+    <div class="sb-logo">OverCoffee</div>
+    <div class="sb-title">Agent Dashboard</div>
+  </div>
+
+  <div class="sb-sec">Client</div>
+  <button class="fb active" onclick="setClient('all',this)">
+    <span class="dot" style="background:#888"></span>All clients
+    <span class="ct" id="ct-all">—</span>
+  </button>
+  <button class="fb" onclick="setClient('TCC',this)">
+    <span class="dot" style="background:#5B3FBF"></span>Texas Cannabis Clinic
+    <span class="ct" id="ct-TCC">—</span>
+  </button>
+  <button class="fb" onclick="setClient('H&S',this)">
+    <span class="dot" style="background:#0F6E56"></span>Horse + Bow
+    <span class="ct" id="ct-HS">—</span>
+  </button>
+  <button class="fb" onclick="setClient('GT4',this)">
+    <span class="dot" style="background:#A05E00"></span>GT4
+    <span class="ct" id="ct-GT4">—</span>
+  </button>
+  <button class="fb" onclick="setClient('Cody',this)">
+    <span class="dot" style="background:#1A7A4A"></span>Cody Young
+    <span class="ct" id="ct-Cody">—</span>
+  </button>
+
+  <div class="sb-sec" style="margin-top:6px">Task type</div>
+  <button class="fb" onclick="setType('SEO',this)"><span class="dot" style="background:#1A5FAB"></span>SEO</button>
+  <button class="fb" onclick="setType('CONTENT',this)"><span class="dot" style="background:#1A7A4A"></span>Content</button>
+  <button class="fb" onclick="setType('EMAIL',this)"><span class="dot" style="background:#8B225A"></span>Email</button>
+  <button class="fb" onclick="setType('PAID',this)"><span class="dot" style="background:#A05E00"></span>Paid</button>
+
+  <div class="sb-stats">
+    <div class="sr"><span class="sl">In queue</span><span class="sv" id="st-queue">—</span></div>
+    <div class="sr"><span class="sl">Completed this session</span><span class="sv" id="st-done" style="color:var(--green)">0</span></div>
+    <div class="sr"><span class="sl">High priority</span><span class="sv" id="st-high" style="color:var(--red)">—</span></div>
+    <div class="sr"><span class="sl">Last synced</span><span class="sv" id="st-sync" style="color:var(--muted);font-weight:400">—</span></div>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="tb-title" id="view-title">All tasks</div>
+    <div class="sw">
+      <span class="si">🔍</span>
+      <input type="text" id="search" placeholder="Search tasks…" oninput="render()">
+    </div>
+    <button class="sync-btn" id="sync-btn" onclick="syncNotion()">↻ Sync Notion</button>
+    <button class="run-all-btn" id="run-all-btn" onclick="runAllHigh()">▶ Run all high-priority</button>
+  </div>
+
+  <div class="content">
+    <div class="status-bar">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">Loading tasks from Notion…</span>
+      <span class="spacer"></span>
+      <a href="https://app.notion.com/p/437767d36c1640b19abbbb6a2523bf5f" target="_blank" style="font-size:11px;color:var(--faint);text-decoration:none">↗ Open in Notion</a>
+    </div>
+    <div class="sec-hd">
+      <span class="sec-label" id="sec-label">Open tasks</span>
+      <span class="sec-count" id="sec-count"></span>
+    </div>
+    <div class="task-grid" id="grid">
+      <div class="loading-state"><div class="spin"></div><p>Fetching live task queue…</p></div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────
+const NOTION_DS = "collection://92fdc628-cd81-41c5-a510-16c799e0de78";
+const NOTION_TASKS_URL = "https://app.notion.com/p/437767d36c1640b19abbbb6a2523bf5f";
+
+// Agent prompts keyed by task type
+const AGENT_PROMPTS = {
+  EMAIL: (t) => `You are a healthcare/brand email copywriter for OverCoffee Consulting, working on client: ${t.client}.
+
+Task: ${t.name}
+Context: ${t.summary}
+
+Write production-ready email copy. Include:
+- 3 subject line options (under 50 chars each) with A/B labels
+- Preview text for each subject line
+- Full body copy (HTML-paragraph friendly)
+- CTA button text (2 options)
+- A brief P.S. or urgency line if relevant
+
+Tone: Match the client brand — compassionate and clear for TCC, warm and community-focused for Horse + Bow.
+Format cleanly with labeled sections. Output should be paste-ready into an ESP.`,
+
+  SEO: (t) => `You are the SEO strategist for OverCoffee Consulting, working on client: ${t.client}.
+
+Task: ${t.name}
+Context: ${t.summary}
+
+Deliver a complete, actionable SEO output. Depending on the task this may include:
+- Prioritized action plan with effort estimates (S/M/L) and expected impact
+- Title tags (3 options, 50-60 chars) and meta descriptions (2 options, 145-158 chars)
+- H1 recommendations aligned with target keywords
+- Specific URLs and pages to act on
+
+Be specific — no vague recommendations. Output should be implementation-ready.`,
+
+  CONTENT: (t) => `You are the content strategist and writer for OverCoffee Consulting, working on client: ${t.client}.
+
+Task: ${t.name}
+Context: ${t.summary}
+
+Produce the full content output. This may include:
+- Complete page copy with headline, sections, CTAs, and FAQ
+- Content brief with outline, target keywords, word count, and internal links
+- Topical cluster map with priority topics and production queue
+
+Match the client's voice — authoritative but accessible for TCC, warm and premium for Horse + Bow, enthusiast-forward for GT4.
+Format with clear section headers. Output should be ready to hand to a developer or publisher.`,
+
+  PAID: (t) => `You are the paid media strategist for OverCoffee Consulting, working on client: ${t.client}.
+
+Task: ${t.name}
+Context: ${t.summary}
+
+Deliver a specific, actionable paid media output:
+- Campaign or ad set recommendations with rationale
+- Ad copy variations (headlines, descriptions, CTAs)
+- Targeting recommendations or budget guidance
+- Any tracking or setup notes
+
+Be precise — include actual copy and numbers where possible.`,
+
+  OPS: (t) => `You are the operations and systems lead for OverCoffee Consulting.
+
+Task: ${t.name}
+Context: ${t.summary}
+
+Produce a clear operational output — this may be an SOP, a checklist, a diagnostic, or a setup guide.
+Write for zero assumed knowledge. Include explicit steps, platform navigation paths where relevant, and define any acronyms.
+Output should be ready to hand to a team member with no briefing.`
+};
+
+// ── STATE ───────────────────────────────────────────────
+let tasks = [];
+let completed = new Set();
+let running = new Set();
+let outputs = {};
+let clientFilter = 'all';
+let typeFilter = null;
+
+// ── NOTION SYNC ─────────────────────────────────────────
+async function syncNotion() {
+  const btn = document.getElementById('sync-btn');
+  btn.textContent = '↻ Syncing…';
+  btn.disabled = true;
+  setStatus(false, 'Syncing with Notion…');
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1000,
+        system: `You are a data extraction assistant. The user will give you Notion task data. 
+Extract ALL tasks and return ONLY a valid JSON array — no markdown, no explanation, no backticks.
+Each task object must have exactly these fields:
+id, name, client, type (Task Type value), priority, status, week, due, url, summary
+If a field is missing use empty string "". Status values: "Not started", "In progress", "Done".`,
+        mcp_servers: [{
+          type: "url",
+          url: "https://mcp.notion.com/mcp",
+          name: "notion-mcp"
+        }],
+        messages: [{
+          role: "user",
+          content: `Fetch all tasks from Notion data source ${NOTION_DS}. 
+Return every task (any status) as a JSON array with fields: id, name, client, type, priority, status, week, due, url, summary.
+Return ONLY the JSON array, nothing else.`
+        }]
+      })
+    });
+
+    const data = await res.json();
+    const text = data.content?.map(b => b.text || '').join('') || '';
+
+    // Extract JSON array from response
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        tasks = parsed.map(t => ({
+          ...t,
+          type: t.type || 'OPS',
+          priority: t.priority || 'Medium',
+          status: t.status || 'Not started',
+        }));
+        const now = new Date().toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit'});
+        document.getElementById('st-sync').textContent = now;
+        setStatus(true, `${tasks.length} tasks loaded from Notion`);
+        render();
+        btn.textContent = '↻ Sync Notion';
+        btn.disabled = false;
+        return;
+      }
+    }
+    throw new Error('Could not parse task list from response');
+
+  } catch(err) {
+    // Fall back to embedded task data
+    loadFallbackTasks();
+    setStatus(true, `Loaded ${tasks.length} tasks (embedded data — reconnect Notion to sync live)`);
+  }
+
+  btn.textContent = '↻ Sync Notion';
+  btn.disabled = false;
+}
+
+function loadFallbackTasks() {
+  tasks = [
+    {id:"t1",name:"Write PTSD email campaign (3 emails)",client:"TCC",type:"EMAIL",priority:"High",status:"Not started",week:"Week 2",due:"2026-06-14",url:"https://app.notion.com/p/375cc25612f281459449f76f07e383c4",summary:"3-email PTSD drip. Email 1: Does PTSD qualify? Email 2: What to expect at TCC. Email 3: Patient story + CTA. Build in Salesforce as drafts for review."},
+    {id:"t2",name:"Diagnose organic position decline (7.0 → 9.8)",client:"TCC",type:"SEO",priority:"High",status:"In progress",week:"Week 1",due:"2026-06-07",url:"https://app.notion.com/p/375cc25612f2814bacd7c18c9732fef0",summary:"GSC diagnostic complete. Next: build prioritized remediation plan. Broad site decline consistent with May 2026 spam update. Delta-8 cluster dragging authority."},
+    {id:"t3",name:"Begin topical map + content creation",client:"GT4",type:"CONTENT",priority:"High",status:"Not started",week:"Week 2",due:"2026-06-14",url:"https://app.notion.com/p/375cc25612f281738cf9d6135422ef27",summary:"Start building topical authority map. Identify 5–10 priority topics, assign to production queue for the month."},
+    {id:"t4",name:"Migrate PTSD email to HTML format",client:"TCC",type:"EMAIL",priority:"High",status:"Not started",week:"Week 2",due:"2026-06-14",url:"https://app.notion.com/p/375cc25612f2818182baf5a4bf825c3d",summary:"PTSD opt-out at 4.81% vs Chronic Pain at 0.40%. Build HTML version matching Chronic Pain template. Test on 20% segment first. Fix 183% open rate anomaly."},
+    {id:"t5",name:"Send June event reminder email",client:"H&S",type:"EMAIL",priority:"High",status:"Not started",week:"Week 3",due:"2026-06-16",url:"https://app.notion.com/p/375cc25612f2814b9566d7727591a765",summary:"1 week before event. One button, urgency copy. Compare engagement vs announcement email."},
+    {id:"t6",name:"Expand /idpc/ Direct Primary Care page",client:"H&S",type:"CONTENT",priority:"High",status:"Not started",week:"Week 3",due:"2026-06-21",url:"https://app.notion.com/p/375cc25612f281418622c890e50497ff",summary:"/idpc/ has 41.9s avg engagement time. Add: who it's for, what's included, cost, FAQ. Add Schedule a Call CTA above fold and at bottom."},
+    {id:"t7",name:"Rewrite Liberty Hill title tag + meta",client:"TCC",type:"SEO",priority:"High",status:"Not started",week:"Week 3",due:"2026-06-21",url:"https://app.notion.com/p/375cc25612f2819e9062defaa817c06b",summary:"Liberty Hill city page needs updated title tag and meta description to improve CTR from search results."},
+    {id:"t8",name:"Build Austin city landing page",client:"TCC",type:"CONTENT",priority:"Medium",status:"Not started",week:"Week 4",due:"2026-06-28",url:"https://app.notion.com/p/375cc25612f2810c83dac84229d141be",summary:"Model after Houston/San Antonio. Check current GSC position. Add FAQ targeting local queries. Submit to GSC."},
+    {id:"t9",name:"Build Fort Worth city landing page",client:"TCC",type:"CONTENT",priority:"High",status:"Done",week:"Week 2",due:"2026-06-14",url:"https://app.notion.com/p/375cc25612f2811ebb76d7a6e975fca3",summary:"Fort Worth: 27.8% conversion rate with no dedicated page. Model after Houston/San Antonio."},
+  ];
+  document.getElementById('st-sync').textContent = 'embedded';
+}
+
+// ── RENDER ───────────────────────────────────────────────
+function setStatus(live, msg) {
+  document.getElementById('status-dot').className = 'status-dot' + (live ? ' live' : '');
+  document.getElementById('status-text').textContent = msg;
+}
+
+function visible() {
+  const q = document.getElementById('search').value.toLowerCase();
+  return tasks.filter(t => {
+    const cm = clientFilter === 'all' || t.client === clientFilter;
+    const tm = !typeFilter || t.type === typeFilter;
+    const sm = !q || t.name.toLowerCase().includes(q) || (t.summary||'').toLowerCase().includes(q);
+    return cm && tm && sm;
+  });
+}
+
+function updateCounts() {
+  const open = tasks.filter(t => t.status !== 'Done' && !completed.has(t.id));
+  document.getElementById('ct-all').textContent = open.length;
+  ['TCC','H&S','GT4','Cody'].forEach(c => {
+    const el = document.getElementById('ct-' + c.replace('&',''));
+    if(el) el.textContent = open.filter(t => t.client === c).length;
+  });
+  document.getElementById('st-queue').textContent = open.length;
+  document.getElementById('st-done').textContent = completed.size;
+  document.getElementById('st-high').textContent = open.filter(t => t.priority === 'High').length;
+}
+
+function render() {
+  const grid = document.getElementById('grid');
+  const vis = visible();
+  const open = vis.filter(t => t.status !== 'Done' && !completed.has(t.id));
+  const done = vis.filter(t => t.status === 'Done' || completed.has(t.id));
+  const sorted = [
+    ...open.sort((a,b) => ({High:0,Medium:1,Low:2}[a.priority]||1) - ({High:0,Medium:1,Low:2}[b.priority]||1)),
+    ...done
+  ];
+
+  document.getElementById('sec-count').textContent = `${open.length} open · ${done.length} done`;
+  updateCounts();
+
+  if (!sorted.length) {
+    grid.innerHTML = `<div class="empty-state"><h3>No tasks here</h3><p>Try a different filter or sync Notion.</p></div>`;
+    return;
+  }
+
+  grid.innerHTML = sorted.map(card).join('');
+}
+
+function card(t) {
+  const isDone = t.status === 'Done' || completed.has(t.id);
+  const isRunning = running.has(t.id);
+  const hasOut = outputs[t.id];
+  const ck = t.client.replace('&','');
+
+  const action = isDone
+    ? `<span class="done-badge">✓ Done</span>`
+    : isRunning
+    ? `<button class="run-btn" disabled><div class="spin"></div> Running…</button>`
+    : `<button class="run-btn" onclick="runTask('${t.id}')">▶ Run</button>`;
+
+  const prog = `<div class="prog-wrap ${isRunning?'on':''}" id="prog-${t.id}"><div class="prog-bar" id="pb-${t.id}"></div></div>`;
+
+  let outPanel = '';
+  if (hasOut || isRunning) {
+    outPanel = `
+    <div class="out-panel on" id="panel-${t.id}">
+      <div class="out-hd">
+        ${isRunning ? '<div class="spin"></div>' : '✓'}
+        <span>${isRunning ? 'Agent working…' : 'Output ready'}</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--faint)">${t.type} · ${t.client}</span>
+      </div>
+      <div class="out-body" id="out-${t.id}">${hasOut||''}</div>
+      ${hasOut ? `<div class="out-actions">
+        <button class="copy-btn" onclick="copyOut('${t.id}')">Copy output</button>
+        <button class="notion-save-btn" onclick="saveToNotion('${t.id}')">Save to Notion task ↗</button>
+      </div>` : ''}
+    </div>`;
+  }
+
+  return `
+  <div class="task-card ${isDone?'completed':''} ${isRunning?'running':''}" id="card-${t.id}">
+    <div class="card-hd">
+      <div class="card-meta">
+        <div class="card-title">${t.name}</div>
+        <div class="card-tags">
+          <span class="tag tc-${ck}">${t.client}</span>
+          <span class="tag tt-${t.type}">${t.type}</span>
+          <span class="tag tp-${t.priority}">${t.priority}</span>
+          ${isDone ? '<span class="tag ts-done">Done</span>' : ''}
+          ${t.status==='In progress'&&!isDone ? '<span class="tag ts-prog">In progress</span>' : ''}
+          ${t.due ? `<span style="font-size:11px;color:var(--faint)">Due ${t.due}</span>` : ''}
+        </div>
+      </div>
+      <div class="card-right">
+        <span class="card-week">${t.week||''}</span>
+        <a class="notion-link" href="${t.url}" target="_blank">↗ Notion</a>
+        ${action}
+      </div>
+    </div>
+    ${t.summary ? `<div class="card-summary">${t.summary}</div>` : ''}
+    ${prog}
+    ${outPanel}
+  </div>`;
+}
+
+// ── AGENT RUNNER ─────────────────────────────────────────
+async function runTask(id) {
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+
+  running.add(id);
+  render();
+
+  const pb = document.getElementById(`pb-${id}`);
+  let pct = 0;
+  const iv = setInterval(() => { pct = Math.min(pct + Math.random()*3.5, 88); if(pb) pb.style.width = pct+'%'; }, 450);
+
+  const promptFn = AGENT_PROMPTS[t.type] || AGENT_PROMPTS['OPS'];
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1000,
+        messages: [{ role: "user", content: promptFn(t) }]
+      })
+    });
+    clearInterval(iv);
+    if(pb) pb.style.width = '100%';
+
+    const data = await res.json();
+    const text = data.content?.map(b => b.text||'').join('') || 'No output returned.';
+    outputs[id] = fmt(text);
+  } catch(err) {
+    clearInterval(iv);
+    if(pb) pb.style.width = '100%';
+    outputs[id] = `<p style="color:var(--red)">⚠ Agent error: ${err.message}</p>`;
+  }
+
+  running.delete(id);
+  completed.add(id);
+  render();
+}
+
+async function runAllHigh() {
+  const btn = document.getElementById('run-all-btn');
+  btn.disabled = true;
+  const ready = tasks.filter(t => t.priority === 'High' && t.status !== 'Done' && !completed.has(t.id) && !running.has(t.id));
+  for (const t of ready.slice(0,3)) {
+    runTask(t.id);
+    await new Promise(r => setTimeout(r, 900));
+  }
+  setTimeout(() => { btn.disabled = false; }, 3000);
+}
+
+// ── SAVE TO NOTION ────────────────────────────────────────
+async function saveToNotion(id) {
+  const t = tasks.find(x => x.id === id);
+  const rawText = document.getElementById(`out-${id}`)?.innerText || '';
+  if (!t || !rawText) return;
+
+  const btn = event.target;
+  btn.textContent = 'Saving…';
+  btn.disabled = true;
+
+  try {
+    await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1000,
+        system: "You update Notion pages using MCP tools. When asked to update a page, call the notion update tool to insert the content and mark the task Done. Respond with only 'Saved.' when done.",
+        mcp_servers: [{ type: "url", url: "https://mcp.notion.com/mcp", name: "notion-mcp" }],
+        messages: [{ role: "user", content: `Update Notion page ${t.url}: 
+1. Insert this content into the page body: \n\n${rawText}
+2. Update the Status property to "Done"` }]
+      })
+    });
+    btn.textContent = '✓ Saved to Notion';
+    btn.style.background = 'var(--green-bg)';
+    btn.style.color = 'var(--green)';
+    btn.style.borderColor = 'var(--green)';
+  } catch(err) {
+    btn.textContent = 'Save failed — open Notion manually';
+    btn.disabled = false;
+  }
+}
+
+function copyOut(id) {
+  const text = document.getElementById(`out-${id}`)?.innerText || '';
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.target;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy output'; }, 1800);
+  });
+}
+
+// ── FILTERS ──────────────────────────────────────────────
+function setClient(c, btn) {
+  clientFilter = c; typeFilter = null;
+  document.querySelectorAll('.fb').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const labels = {all:'All tasks',TCC:'Texas Cannabis Clinic','H&S':'Horse + Bow',GT4:'GT4',Cody:'Cody Young'};
+  document.getElementById('view-title').textContent = labels[c]||c;
+  render();
+}
+function setType(tp, btn) {
+  if (typeFilter === tp) {
+    typeFilter = null; clientFilter = 'all';
+    document.querySelectorAll('.fb').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.fb')[0].classList.add('active');
+    document.getElementById('view-title').textContent = 'All tasks';
+  } else {
+    typeFilter = tp; clientFilter = 'all';
+    document.querySelectorAll('.fb').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('view-title').textContent = tp + ' tasks';
+  }
+  render();
+}
+
+// ── FORMAT ───────────────────────────────────────────────
+function fmt(raw) {
+  return raw
+    .replace(/^## (.+)$/gm,'<h3>$1</h3>')
+    .replace(/^### (.+)$/gm,'<h3>$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/^[-•] (.+)$/gm,'<li>$1</li>')
+    .replace(/(<li>[\s\S]*?<\/li>)/g,'<ul>$1</ul>')
+    .replace(/\n\n+/g,'</p><p>')
+    .replace(/^(?!<[hup])(.+)$/gm,'<p>$1</p>')
+    .replace(/<p><\/p>/g,'')
+    .replace(/<p>(<h)/g,'$1')
+    .replace(/(<\/h[0-9]>)<\/p>/g,'$1');
+}
+
+// ── INIT ─────────────────────────────────────────────────
+loadFallbackTasks();
+render();
+setStatus(true, `${tasks.length} tasks loaded — click Sync Notion for live data`);
+document.getElementById('st-sync').textContent = 'embedded';
+</script>
+</body>
+</html>
