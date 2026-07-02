@@ -20,8 +20,6 @@
 }
 body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5}
 .shell{display:flex;height:100vh;overflow:hidden}
-
-/* Sidebar */
 .sb{width:252px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
 .sb-hd{padding:18px 16px 14px;border-bottom:1px solid var(--border)}
 .sb-logo{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
@@ -35,8 +33,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .sb-stats{margin-top:auto;padding:12px 16px;border-top:1px solid var(--border)}
 .sr{display:flex;justify-content:space-between;padding:3px 0}
 .sl{font-size:12px;color:var(--muted)}.sv{font-size:12px;font-weight:600}
-
-/* Main */
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden}
 .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;gap:10px;flex-shrink:0}
 .tb-title{font-size:15px;font-weight:600;flex:1}
@@ -44,28 +40,20 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .sw input{padding:7px 10px 7px 30px;border:1px solid var(--border);border-radius:var(--r);background:var(--s2);font-family:var(--font);font-size:13px;color:var(--text);width:190px;outline:none}
 .sw input:focus{border-color:var(--accent);background:#fff}
 .si{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--faint);font-size:12px;pointer-events:none}
-.sync-btn{padding:7px 12px;border-radius:var(--r);font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--s2);color:var(--muted);white-space:nowrap;transition:all .15s}
-.sync-btn:hover{border-color:var(--bstrong)}
+.sync-btn{padding:7px 12px;border-radius:var(--r);font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--s2);color:var(--muted);white-space:nowrap}
 .sync-btn:disabled{opacity:.5;cursor:not-allowed}
-.run-all-btn{padding:7px 13px;border-radius:var(--r);font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;border:none;background:var(--accent);color:#fff;white-space:nowrap;transition:opacity .15s;display:flex;align-items:center;gap:6px}
-.run-all-btn:hover{opacity:.88}
-.run-all-btn:disabled{opacity:.45;cursor:not-allowed}
+.run-all-btn{padding:7px 13px;border-radius:var(--r);font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;border:none;background:var(--accent);color:#fff;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.run-all-btn:hover{opacity:.88}.run-all-btn:disabled{opacity:.45;cursor:not-allowed}
 .content{flex:1;overflow-y:auto;padding:20px}
-
-/* Status */
 .status-bar{display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);font-size:12px;color:var(--muted)}
 .sdot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex-shrink:0;transition:background .3s}
 .sdot.live{background:var(--green);animation:pulse 2s infinite}
 .sdot.loading{background:var(--amber);animation:pulse .8s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .status-bar a{font-size:11px;color:var(--faint);text-decoration:none;margin-left:auto}
-.status-bar a:hover{color:var(--accent)}
-
 .sec-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .sec-label{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
 .sec-count{font-size:12px;color:var(--muted)}
-
-/* Cards */
 .task-grid{display:flex;flex-direction:column;gap:9px}
 .task-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;transition:border-color .15s,box-shadow .15s}
 .task-card:hover{border-color:var(--bstrong);box-shadow:0 2px 8px rgba(0,0,0,.05)}
@@ -80,6 +68,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .tc-HS{background:var(--tbg);color:var(--teal)}
 .tc-GT4{background:var(--ambg);color:var(--amber)}
 .tc-Cody{background:var(--gbg);color:var(--green)}
+.tc-default{background:var(--s2);color:var(--muted)}
 .tt-SEO{background:#E6F4FF;color:#1A5FAB}
 .tt-EMAIL{background:#FFF0F6;color:#8B225A}
 .tt-CONTENT{background:var(--gbg);color:var(--green)}
@@ -94,53 +83,45 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .card-week{font-size:11px;color:var(--faint);white-space:nowrap}
 .notion-link{font-size:11px;color:var(--faint);text-decoration:none}
 .notion-link:hover{color:var(--accent)}
-
-/* Run button */
-.run-btn{display:flex;align-items:center;gap:5px;padding:7px 13px;border:none;background:var(--accent);color:#fff;border-radius:var(--r);font-family:var(--font);font-size:12px;font-weight:500;cursor:pointer;transition:opacity .15s;white-space:nowrap}
-.run-btn:hover{opacity:.85}
-.run-btn:disabled{opacity:.38;cursor:not-allowed}
+.run-btn{display:flex;align-items:center;gap:5px;padding:7px 13px;border:none;background:var(--accent);color:#fff;border-radius:var(--r);font-family:var(--font);font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap}
+.run-btn:hover{opacity:.85}.run-btn:disabled{opacity:.38;cursor:not-allowed}
 .done-badge{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;color:var(--green)}
-
 .card-summary{padding:0 14px 12px;font-size:13px;color:var(--muted);line-height:1.55}
-
-/* Progress */
-.prog-wrap{height:2px;background:var(--border);margin:0 14px 0;border-radius:2px;overflow:hidden;display:none}
+.prog-wrap{height:2px;background:var(--border);margin:0 14px;border-radius:2px;overflow:hidden;display:none}
 .prog-wrap.on{display:block}
 .prog-bar{height:100%;background:var(--accent);border-radius:2px;width:0%;transition:width .4s ease}
-
-/* Output */
 .out-panel{margin:10px 14px 13px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;display:none}
 .out-panel.on{display:block}
 .out-hd{display:flex;align-items:center;gap:7px;padding:8px 12px;background:var(--s2);border-bottom:1px solid var(--border);font-size:12px;font-weight:500;color:var(--muted)}
 .out-hd .badge{margin-left:auto;font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;background:var(--gbg);color:var(--green);padding:2px 7px;border-radius:4px}
-.out-body{padding:14px;font-size:13px;line-height:1.7;color:var(--text);max-height:500px;overflow-y:auto}
-.out-body h2{font-size:14px;font-weight:600;margin:14px 0 6px;color:var(--text)}
-.out-body h3{font-size:13px;font-weight:600;margin:12px 0 5px;color:var(--text)}
+.out-body{padding:14px;font-size:13px;line-height:1.7;color:var(--text);max-height:460px;overflow-y:auto}
+.out-body h2{font-size:14px;font-weight:600;margin:14px 0 6px}
+.out-body h3{font-size:13px;font-weight:600;margin:12px 0 5px}
 .out-body p{margin-bottom:9px}
 .out-body ul,.out-body ol{padding-left:20px;margin-bottom:9px}
 .out-body li{margin-bottom:4px}
 .out-body strong{font-weight:600}
 .out-body hr{border:none;border-top:1px solid var(--border);margin:12px 0}
-.out-body code{font-family:monospace;font-size:12px;background:var(--s2);padding:1px 5px;border-radius:3px}
-.out-actions{display:flex;gap:8px;padding:9px 12px;border-top:1px solid var(--border);background:var(--s2)}
-.copy-btn{padding:5px 11px;border-radius:6px;font-family:var(--font);font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--muted);transition:all .12s}
-.copy-btn:hover{border-color:var(--bstrong);color:var(--text)}
-.notion-save-btn{padding:5px 11px;border-radius:6px;font-family:var(--font);font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--accent);background:var(--abg);color:var(--accent);transition:all .12s}
-.notion-save-btn:hover{background:var(--accent);color:#fff}
-.notion-save-btn:disabled{opacity:.4;cursor:not-allowed}
 
-/* Spinner */
+/* Action bar below output */
+.out-actions{display:flex;gap:8px;padding:9px 12px;border-top:1px solid var(--border);background:var(--s2);flex-wrap:wrap;align-items:center}
+.act-btn{padding:6px 12px;border-radius:6px;font-family:var(--font);font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--muted);transition:all .12s;text-decoration:none;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.act-btn:hover{border-color:var(--bstrong);color:var(--text)}
+.act-btn.primary{border-color:var(--accent);background:var(--abg);color:var(--accent)}
+.act-btn.primary:hover{background:var(--accent);color:#fff}
+.act-btn.success{border-color:var(--green);background:var(--gbg);color:var(--green)}
+.act-btn.success:hover{background:var(--green);color:#fff}
+.act-btn:disabled{opacity:.4;cursor:not-allowed;pointer-events:none}
+
+/* Project badge on Claude button */
+.project-badge{font-size:10px;background:rgba(255,255,255,.25);padding:1px 5px;border-radius:3px;margin-left:2px}
+
 .spin{width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
 .spin.dark{border:2px solid var(--border);border-top-color:var(--accent)}
 @keyframes spin{to{transform:rotate(360deg)}}
-
-/* Error */
 .err-msg{padding:10px 14px;background:var(--rbg);color:var(--red);font-size:12px;border-top:1px solid #f0c0bb}
-
-/* Empty / loading */
 .center-msg{text-align:center;padding:60px 20px;color:var(--muted)}
 .center-msg h3{font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px}
-
 ::-webkit-scrollbar{width:5px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:10px}
@@ -179,7 +160,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
     <div class="sw"><span class="si">🔍</span><input type="text" id="search" placeholder="Search tasks…" oninput="render()"></div>
     <button class="sync-btn" id="sync-btn" onclick="syncNotion()">↻ Sync Notion</button>
     <button class="run-all-btn" id="run-all-btn" onclick="runAllHigh()">
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="white"><path d="M2 1.5l8 4.5-8 4.5z"/></svg>
+      <svg width="11" height="11" viewBox="0 0 11 11" fill="white"><path d="M2 1.5l7 4-7 4z"/></svg>
       Run all high-priority
     </button>
   </div>
@@ -195,79 +176,92 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
       <span class="sec-count" id="sec-count"></span>
     </div>
     <div class="task-grid" id="grid">
-      <div class="center-msg"><h3>Loading…</h3><p>Fetching your task queue.</p></div>
+      <div class="center-msg"><h3>Loading…</h3></div>
     </div>
   </div>
 </div>
 </div>
 
 <script>
-// ── CONFIG ──────────────────────────────────────────────────────────────────
-const NOTION_MCP   = "https://mcp.notion.com/mcp";
-const NOTION_DS    = "collection://92fdc628-cd81-41c5-a510-16c799e0de78";
-const AGENT_URL    = "/.netlify/functions/agent";
+// ── CLIENT → CLAUDE PROJECT MAPPING ─────────────────────────────────────────
+const CLIENT_PROJECTS = {
+  "TCC":       { id: "019d7d60-d2df-719a-aea4-93eb0d506f52", label: "TCC Project" },
+  "H&S":       { id: "019dacb8-233d-742d-8d0d-62e04d9db806", label: "Horse + Bow" },
+  "GT4":       { id: "019e7937-ccd1-76f8-a3d0-e9a46d33bead", label: "GT4 Project" },
+  "Cody":      { id: "019dacc9-0f9d-7096-b3aa-4573e4772658", label: "Cody Project" },
+  "Heart":     { id: "019d8840-8397-75a8-8d9f-9775c93e65e4", label: "Heart & Soul" },
+  "Tutte":     { id: "019dfe3f-8f27-7325-9fd4-cac4b9058ed7", label: "Tutte al Forno" },
+  "Rachel":    { id: "019dacb1-586b-77ec-869a-70bd25cae2ba", label: "Rachel Jackson" },
+  "Cafe":      { id: "019dacaa-d1fc-76eb-afc7-4cbe1fa493f5", label: "Cafe Primavera" },
+  "PSRT":      { id: "019d9bf8-83de-7358-b95d-70b9c2e8c302", label: "PSRT" },
+  "Barworks":  { id: "019d9bec-e197-729b-adf8-98a6ae98b58c", label: "Barworks" },
+  "Continental":{ id: "019d884f-c64f-7044-9429-52b9b92c443c", label: "Continental" },
+  "Feast":     { id: "019d883b-230c-7697-8e97-b0894aa59f64", label: "Feast for a King" },
+  "OCC":       { id: "019dad45-4ac5-7394-8761-30d68683ee01", label: "Agency Master" },
+};
+const DEFAULT_PROJECT = { id: "019dad45-4ac5-7394-8761-30d68683ee01", label: "Agency Master" };
+
+function getProject(clientKey) {
+  return CLIENT_PROJECTS[clientKey] || DEFAULT_PROJECT;
+}
+
+function claudeURL(task, outputText) {
+  const proj = getProject(task.client);
+  const msg = outputText
+    ? `Here's the agent output for "${task.name}" — let's refine it:\n\n${outputText.slice(0, 1800)}`
+    : `I need help with this task: ${task.name}\n\nContext: ${task.summary}`;
+  return `https://claude.ai/project/${proj.id}?q=${encodeURIComponent(msg)}`;
+}
+
+// ── CONFIG ───────────────────────────────────────────────────────────────────
+const NOTION_MCP = "https://mcp.notion.com/mcp";
+const NOTION_DS  = "collection://92fdc628-cd81-41c5-a510-16c799e0de78";
+const AGENT_URL  = "/.netlify/functions/agent";
 
 // ── STATE ────────────────────────────────────────────────────────────────────
-let tasks    = [];
-let running  = new Set();
-let done     = new Set();
-let outputs  = {};
-let errors   = {};
-let clientF  = 'all';
-let typeF    = null;
+let tasks   = [];
+let running = new Set();
+let done    = new Set();
+let outputs = {};
+let errors  = {};
+let clientF = 'all';
+let typeF   = null;
 
-// ── NOTION SYNC ──────────────────────────────────────────────────────────────
+// ── NOTION SYNC ───────────────────────────────────────────────────────────────
 async function syncNotion() {
   const btn = document.getElementById('sync-btn');
   btn.textContent = '↻ Syncing…';
   btn.disabled = true;
   setStatus('loading', 'Syncing with Notion…');
-
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch("/.netlify/functions/sync", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 1000,
-        system: `You fetch Notion tasks and return ONLY a raw JSON array — no markdown, no explanation, no backticks, no code fences.
-Each object must have: id, name, client, type, priority, status, week, due, url, summary, notes.
-Use "" for missing fields. Status values: "Not started", "In progress", "Done".`,
-        mcp_servers: [{ type: "url", url: NOTION_MCP, name: "notion" }],
-        messages: [{ role: "user", content: `Fetch all tasks from ${NOTION_DS}. Return ONLY the raw JSON array.` }]
-      })
+      headers: { "Content-Type": "application/json" }
     });
-
     const data = await res.json();
-    const text = data.content?.map(b => b.text || '').join('') || '';
-    const match = text.match(/\[[\s\S]*\]/);
-
-    if (match) {
-      const parsed = JSON.parse(match[0]);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        tasks = parsed.map(t => ({
-          ...t,
-          type:     t.type     || 'OPS',
-          priority: t.priority || 'Medium',
-          status:   t.status   || 'Not started',
-        }));
-        const now = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
-        document.getElementById('st-sync').textContent = now;
-        setStatus('live', `${tasks.length} tasks synced from Notion`);
-        render();
-        btn.textContent = '↻ Sync Notion';
-        btn.disabled = false;
-        return;
-      }
+    if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+    if (Array.isArray(data.tasks) && data.tasks.length > 0) {
+      tasks = data.tasks.map(t => ({
+        ...t,
+        type:     t.type     || 'OPS',
+        priority: t.priority || 'Medium',
+        status:   t.status   || 'Not started'
+      }));
+      const now = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+      document.getElementById('st-sync').textContent = now;
+      setStatus('live', `${tasks.length} tasks synced from Notion`);
+      render();
+      btn.textContent = '↻ Sync Notion';
+      btn.disabled = false;
+      return;
     }
-    throw new Error('No tasks returned');
-
+    throw new Error('No tasks returned from Notion');
   } catch(err) {
+    setStatus('live', `Sync failed: ${err.message} — showing embedded tasks`);
     loadFallback();
-    setStatus('live', `${tasks.length} tasks loaded (embedded — sync to get live data)`);
+    render();
     document.getElementById('st-sync').textContent = 'embedded';
   }
-
   btn.textContent = '↻ Sync Notion';
   btn.disabled = false;
 }
@@ -275,58 +269,43 @@ Use "" for missing fields. Status values: "Not started", "In progress", "Done".`
 function loadFallback() {
   tasks = [
     {id:"t1",name:"Write PTSD email campaign (3 emails)",client:"TCC",type:"EMAIL",priority:"High",status:"Not started",week:"Week 2",due:"2026-06-14",url:"https://app.notion.com/p/375cc25612f281459449f76f07e383c4",summary:"3-email PTSD drip. Email 1: Does PTSD qualify? Email 2: What to expect at TCC. Email 3: Patient story + CTA.",notes:"Build in Salesforce as drafts for review."},
-    {id:"t2",name:"Diagnose organic position decline (7.0 → 9.8)",client:"TCC",type:"SEO",priority:"High",status:"In progress",week:"Week 1",due:"2026-06-07",url:"https://app.notion.com/p/375cc25612f2814bacd7c18c9732fef0",summary:"GSC diagnostic complete. Broad site decline consistent with May 2026 spam update. Delta-8 cluster dragging authority.",notes:"Fort Worth improved 6.83→4.54, validates city page strategy."},
-    {id:"t3",name:"Begin topical map + content creation",client:"GT4",type:"CONTENT",priority:"High",status:"Not started",week:"Week 2",due:"2026-06-14",url:"https://app.notion.com/p/375cc25612f281738cf9d6135422ef27",summary:"Start building topical authority map. 5–10 priority topics, assign to production queue for the month.",notes:""},
-    {id:"t4",name:"Migrate PTSD email to HTML format",client:"TCC",type:"EMAIL",priority:"High",status:"Not started",week:"Week 2",due:"2026-06-14",url:"https://app.notion.com/p/375cc25612f2818182baf5a4bf825c3d",summary:"PTSD opt-out 4.81% vs Chronic Pain 0.40%. Build HTML version matching Chronic Pain template. Test 20% segment first.",notes:"Also fix 183% open rate anomaly in Salesforce."},
-    {id:"t5",name:"Send June event reminder email",client:"H&S",type:"EMAIL",priority:"High",status:"Not started",week:"Week 3",due:"2026-06-16",url:"https://app.notion.com/p/375cc25612f2814b9566d7727591a765",summary:"1 week before event. One button, urgency copy. Compare engagement vs announcement email.",notes:""},
+    {id:"t2",name:"Diagnose organic position decline (7.0 → 9.8)",client:"TCC",type:"SEO",priority:"High",status:"In progress",week:"Week 1",due:"2026-06-07",url:"https://app.notion.com/p/375cc25612f2814bacd7c18c9732fef0",summary:"GSC diagnostic complete. Broad site decline consistent with May 2026 spam update. Delta-8 cluster dragging authority.",notes:"Fort Worth improved 6.83→4.54."},
+    {id:"t3",name:"Begin topical map + content creation",client:"GT4",type:"CONTENT",priority:"High",status:"Not started",week:"Week 2",due:"2026-06-14",url:"https://app.notion.com/p/375cc25612f281738cf9d6135422ef27",summary:"Start building topical authority map. 5–10 priority topics, assign to production queue.",notes:""},
+    {id:"t4",name:"Migrate PTSD email to HTML format",client:"TCC",type:"EMAIL",priority:"High",status:"Not started",week:"Week 2",due:"2026-06-14",url:"https://app.notion.com/p/375cc25612f2818182baf5a4bf825c3d",summary:"PTSD opt-out 4.81% vs Chronic Pain 0.40%. Build HTML version matching Chronic Pain template.",notes:"Fix 183% open rate anomaly in Salesforce."},
+    {id:"t5",name:"Send June event reminder email",client:"H&S",type:"EMAIL",priority:"High",status:"Not started",week:"Week 3",due:"2026-06-16",url:"https://app.notion.com/p/375cc25612f2814b9566d7727591a765",summary:"1 week before event. One button, urgency copy.",notes:""},
     {id:"t6",name:"Expand /idpc/ Direct Primary Care page",client:"H&S",type:"CONTENT",priority:"High",status:"Not started",week:"Week 3",due:"2026-06-21",url:"https://app.notion.com/p/375cc25612f281418622c890e50497ff",summary:"/idpc/ has 41.9s avg engagement time. Add: who it's for, what's included, cost, FAQ.",notes:"Add Schedule a Call CTA above fold and at bottom."},
-    {id:"t7",name:"Rewrite Liberty Hill title tag + meta",client:"TCC",type:"SEO",priority:"High",status:"Not started",week:"Week 3",due:"2026-06-21",url:"https://app.notion.com/p/375cc25612f2819e9062defaa817c06b",summary:"Liberty Hill city page needs updated title tag and meta description to improve CTR.",notes:""},
-    {id:"t8",name:"Build Austin city landing page",client:"TCC",type:"CONTENT",priority:"Medium",status:"Not started",week:"Week 4",due:"2026-06-28",url:"https://app.notion.com/p/375cc25612f2810c83dac84229d141be",summary:"Model after Houston/San Antonio. Add FAQ targeting local queries. Submit to GSC.",notes:"Check current GSC position first."},
-    {id:"t9",name:"Build Fort Worth city landing page",client:"TCC",type:"CONTENT",priority:"High",status:"Done",week:"Week 2",due:"2026-06-14",url:"https://app.notion.com/p/375cc25612f2811ebb76d7a6e975fca3",summary:"Fort Worth: 27.8% conversion rate with no dedicated page.",notes:""}
+    {id:"t7",name:"Rewrite Liberty Hill title tag + meta",client:"TCC",type:"SEO",priority:"High",status:"Not started",week:"Week 3",due:"2026-06-21",url:"https://app.notion.com/p/375cc25612f2819e9062defaa817c06b",summary:"Liberty Hill city page needs updated title tag and meta to improve CTR.",notes:""},
+    {id:"t8",name:"Build Austin city landing page",client:"TCC",type:"CONTENT",priority:"Medium",status:"Not started",week:"Week 4",due:"2026-06-28",url:"https://app.notion.com/p/375cc25612f2810c83dac84229d141be",summary:"Model after Houston/San Antonio. Add FAQ targeting local queries.",notes:""},
+    {id:"t9",name:"Build Fort Worth city landing page",client:"TCC",type:"CONTENT",priority:"High",status:"Done",week:"Week 2",due:"2026-06-14",url:"https://app.notion.com/p/375cc25612f2811ebb76d7a6e975fca3",summary:"Fort Worth: 27.8% conversion rate, no dedicated page.",notes:""}
   ];
 }
 
-// ── AGENT RUNNER ─────────────────────────────────────────────────────────────
+// ── AGENT RUNNER ──────────────────────────────────────────────────────────────
 async function runTask(id) {
   const task = tasks.find(t => t.id === id);
   if (!task || running.has(id)) return;
-
   running.add(id);
   delete errors[id];
   render();
-
   const pb = document.getElementById(`pb-${id}`);
   let pct = 0;
-  const iv = setInterval(() => {
-    pct = Math.min(pct + Math.random() * 3, 88);
-    if (pb) pb.style.width = pct + '%';
-  }, 500);
-
+  const iv = setInterval(() => { pct = Math.min(pct + Math.random()*3, 88); if(pb) pb.style.width = pct+'%'; }, 500);
   try {
     const res = await fetch(AGENT_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(task)
     });
-
     clearInterval(iv);
     if (pb) pb.style.width = '100%';
-
     const data = await res.json();
-
-    if (!res.ok || data.error) {
-      errors[id] = data.error || `HTTP ${res.status}`;
-    } else {
-      outputs[id] = fmt(data.output);
-      done.add(id);
-    }
-
+    if (!res.ok || data.error) { errors[id] = data.error || `HTTP ${res.status}`; }
+    else { outputs[id] = fmt(data.output); done.add(id); }
   } catch(err) {
     clearInterval(iv);
     if (pb) pb.style.width = '100%';
     errors[id] = err.message;
   }
-
   running.delete(id);
   render();
 }
@@ -334,16 +313,8 @@ async function runTask(id) {
 async function runAllHigh() {
   const btn = document.getElementById('run-all-btn');
   btn.disabled = true;
-  const ready = tasks.filter(t =>
-    t.priority === 'High' &&
-    t.status !== 'Done' &&
-    !done.has(t.id) &&
-    !running.has(t.id)
-  );
-  for (const t of ready) {
-    runTask(t.id);
-    await new Promise(r => setTimeout(r, 600));
-  }
+  const ready = tasks.filter(t => t.priority==='High' && t.status!=='Done' && !done.has(t.id) && !running.has(t.id));
+  for (const t of ready) { runTask(t.id); await new Promise(r => setTimeout(r, 700)); }
   setTimeout(() => { btn.disabled = false; }, 3000);
 }
 
@@ -352,26 +323,24 @@ async function saveToNotion(id) {
   const task = tasks.find(t => t.id === id);
   const rawText = document.getElementById(`out-body-${id}`)?.innerText || '';
   if (!task || !rawText) return;
-
   const btn = document.getElementById(`save-btn-${id}`);
   btn.textContent = 'Saving…';
   btn.disabled = true;
-
   try {
     await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 500,
-        system: "Update the Notion page using MCP tools. Insert the content and mark Status as Done. Reply only with 'Saved.'",
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 300,
+        system: "Update Notion page via MCP. Insert content and mark Status Done. Reply only 'Saved.'",
         mcp_servers: [{ type: "url", url: NOTION_MCP, name: "notion" }],
-        messages: [{ role: "user", content: `Update Notion page ${task.url}:\n1. Insert this content into the page body:\n\n${rawText}\n\n2. Set Status = "Done"` }]
+        messages: [{ role: "user", content: `Update ${task.url}: insert this content and set Status=Done:\n\n${rawText}` }]
       })
     });
-    btn.textContent = '✓ Saved to Notion';
-    btn.style.cssText = 'border-color:var(--green);background:var(--gbg);color:var(--green);padding:5px 11px;border-radius:6px;font-family:var(--font);font-size:11px;font-weight:500;cursor:default';
-  } catch(err) {
+    btn.textContent = '✓ Saved';
+    btn.className = 'act-btn success';
+  } catch {
     btn.textContent = 'Save failed';
     btn.disabled = false;
   }
@@ -381,23 +350,23 @@ function copyOutput(id) {
   const text = document.getElementById(`out-body-${id}`)?.innerText || '';
   navigator.clipboard.writeText(text).then(() => {
     const btn = document.getElementById(`copy-btn-${id}`);
-    if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy output', 1800); }
+    if (btn) { btn.textContent = '✓ Copied'; setTimeout(() => btn.textContent = 'Copy output', 1800); }
   });
 }
 
-// ── RENDER ───────────────────────────────────────────────────────────────────
+// ── RENDER ────────────────────────────────────────────────────────────────────
 function setStatus(state, msg) {
   const dot = document.getElementById('sdot');
-  dot.className = 'sdot' + (state === 'live' ? ' live' : state === 'loading' ? ' loading' : '');
+  dot.className = 'sdot' + (state==='live' ? ' live' : state==='loading' ? ' loading' : '');
   document.getElementById('stext').textContent = msg;
 }
 
 function updateCounts() {
-  const open = tasks.filter(t => t.status !== 'Done' && !done.has(t.id));
+  const open = tasks.filter(t => t.status!=='Done' && !done.has(t.id));
   document.getElementById('ct-all').textContent = open.length;
   [['TCC','TCC'],['H&S','HS'],['GT4','GT4'],['Cody','Cody']].forEach(([c,k]) => {
     const el = document.getElementById('ct-'+k);
-    if (el) el.textContent = open.filter(t => t.client === c).length;
+    if (el) el.textContent = open.filter(t => t.client===c).length;
   });
   document.getElementById('st-q').textContent = open.length;
   document.getElementById('st-run').textContent = running.size;
@@ -407,19 +376,20 @@ function updateCounts() {
 function visible() {
   const q = document.getElementById('search').value.toLowerCase();
   return tasks.filter(t => {
-    const cm = clientF === 'all' || t.client === clientF;
-    const tm = !typeF || t.type === typeF;
+    const cm = clientF==='all' || t.client===clientF;
+    const tm = !typeF || t.type===typeF;
     const sm = !q || t.name.toLowerCase().includes(q) || (t.summary||'').toLowerCase().includes(q);
     return cm && tm && sm;
   });
 }
 
 function card(t) {
-  const isDone  = t.status === 'Done' || done.has(t.id);
+  const isDone    = t.status==='Done' || done.has(t.id);
   const isRunning = running.has(t.id);
-  const hasOut  = outputs[t.id];
-  const hasErr  = errors[t.id];
-  const ck = t.client.replace('&','');
+  const hasOut    = outputs[t.id];
+  const hasErr    = errors[t.id];
+  const ck        = t.client.replace('&','');
+  const proj      = getProject(t.client);
 
   const action = isDone
     ? `<span class="done-badge">✓ Done</span>`
@@ -431,6 +401,8 @@ function card(t) {
 
   let outSection = '';
   if (hasOut) {
+    const rawText = hasOut.replace(/<[^>]+>/g,'');
+    const openURL = claudeURL(t, rawText);
     outSection = `
     <div class="out-panel on" id="panel-${t.id}">
       <div class="out-hd">
@@ -440,12 +412,26 @@ function card(t) {
       </div>
       <div class="out-body" id="out-body-${t.id}">${hasOut}</div>
       <div class="out-actions">
-        <button class="copy-btn" id="copy-btn-${t.id}" onclick="copyOutput('${t.id}')">Copy output</button>
-        <button class="notion-save-btn" id="save-btn-${t.id}" onclick="saveToNotion('${t.id}')">Save to Notion ↗</button>
+        <button class="act-btn" id="copy-btn-${t.id}" onclick="copyOutput('${t.id}')">Copy output</button>
+        <button class="act-btn success" id="save-btn-${t.id}" onclick="saveToNotion('${t.id}')">Save to Notion ↗</button>
+        <a class="act-btn primary" href="${openURL}" target="_blank">
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="currentColor"><path d="M2 1.5l7 4-7 4z"/></svg>
+          Refine in Claude
+          <span class="project-badge">${proj.label}</span>
+        </a>
       </div>
     </div>`;
   } else if (hasErr) {
-    outSection = `<div class="err-msg">⚠ ${hasErr}${hasErr.includes('ANTHROPIC_API_KEY') ? ' — Add your API key in Netlify: Site settings → Environment variables → ANTHROPIC_API_KEY' : ''}</div>`;
+    const openURL = claudeURL(t, null);
+    outSection = `
+    <div class="err-msg" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <span>⚠ ${hasErr}</span>
+      <a class="act-btn primary" href="${openURL}" target="_blank" style="flex-shrink:0">
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="currentColor"><path d="M2 1.5l7 4-7 4z"/></svg>
+        Run in Claude instead
+        <span style="font-size:10px;opacity:.7;margin-left:2px">${proj.label}</span>
+      </a>
+    </div>`;
   } else if (isRunning) {
     outSection = `
     <div class="out-panel on">
@@ -473,7 +459,7 @@ function card(t) {
         ${action}
       </div>
     </div>
-    ${t.summary ? `<div class="card-summary">${t.summary}${t.notes ? ' ' + t.notes : ''}</div>` : ''}
+    ${t.summary ? `<div class="card-summary">${t.summary}${t.notes?' '+t.notes:''}</div>` : ''}
     ${prog}
     ${outSection}
   </div>`;
@@ -481,8 +467,8 @@ function card(t) {
 
 function render() {
   const vis = visible();
-  const open = vis.filter(t => t.status !== 'Done' && !done.has(t.id));
-  const closed = vis.filter(t => t.status === 'Done' || done.has(t.id));
+  const open = vis.filter(t => t.status!=='Done' && !done.has(t.id));
+  const closed = vis.filter(t => t.status==='Done' || done.has(t.id));
   const sorted = [
     ...open.sort((a,b) => ({High:0,Medium:1,Low:2}[a.priority]||1) - ({High:0,Medium:1,Low:2}[b.priority]||1)),
     ...closed
@@ -497,31 +483,29 @@ function render() {
   grid.innerHTML = sorted.map(card).join('');
 }
 
-// ── FILTERS ───────────────────────────────────────────────────────────────────
 function setClient(c, btn) {
-  clientF = c; typeF = null;
+  clientF=c; typeF=null;
   document.querySelectorAll('.fb').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  const L = {all:'All tasks',TCC:'Texas Cannabis Clinic','H&S':'Horse + Bow',GT4:'GT4',Cody:'Cody Young'};
+  const L={all:'All tasks',TCC:'Texas Cannabis Clinic','H&S':'Horse + Bow',GT4:'GT4',Cody:'Cody Young'};
   document.getElementById('view-title').textContent = L[c]||c;
   render();
 }
 function setType(tp, btn) {
-  if (typeF === tp) {
-    typeF = null; clientF = 'all';
+  if (typeF===tp) {
+    typeF=null; clientF='all';
     document.querySelectorAll('.fb').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.fb')[0].classList.add('active');
     document.getElementById('view-title').textContent = 'All tasks';
   } else {
-    typeF = tp; clientF = 'all';
+    typeF=tp; clientF='all';
     document.querySelectorAll('.fb').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    document.getElementById('view-title').textContent = tp + ' tasks';
+    document.getElementById('view-title').textContent = tp+' tasks';
   }
   render();
 }
 
-// ── FORMAT ────────────────────────────────────────────────────────────────────
 function fmt(raw) {
   return raw
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -539,7 +523,6 @@ function fmt(raw) {
     .replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
 }
 
-// ── INIT ──────────────────────────────────────────────────────────────────────
 loadFallback();
 render();
 setStatus('live', `${tasks.length} tasks loaded — click Sync Notion for live data`);
