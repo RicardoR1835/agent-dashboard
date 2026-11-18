@@ -275,9 +275,11 @@ function buildEmailHtml() {
   const link = /^https?:\/\//i.test($("eUrl").value.trim()) ? $("eUrl").value.trim() : "#";
   const paras = $("eBody").value.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean)
     .map((p) => `<p style="margin:0 0 18px;font-family:${font};font-size:18px;line-height:1.5;color:#2b2b2b;">${esc(p).replace(/\n/g, "<br>")}</p>`).join("\n");
-  const header = b.logo
-    ? `<img src="${esc(b.logo)}" alt="${esc(b.name)}" height="40" style="display:block;height:40px;width:auto;border:0;">`
-    : `<span style="font-family:${head};font-size:20px;font-weight:bold;color:#ffffff;">${esc(b.name)}</span>`;
+  // With a logo: white header so dark logos stay readable, plus a brand-color bar. Without: brand-color header with the name.
+  const headerRow = b.logo
+    ? `<tr><td style="background:#ffffff;padding:20px 32px;border-radius:8px 8px 0 0;"><img src="${esc(b.logo)}" alt="${esc(b.name)}" height="48" style="display:block;height:48px;width:auto;max-width:240px;border:0;"></td></tr>
+<tr><td style="background:${color};height:6px;line-height:6px;font-size:6px;">&nbsp;</td></tr>`
+    : `<tr><td style="background:${color};padding:20px 32px;border-radius:8px 8px 0 0;"><span style="font-family:${head};font-size:20px;font-weight:bold;color:#ffffff;">${esc(b.name)}</span></td></tr>`;
   const ps = $("ePs").value.trim()
     ? `<p style="margin:0;font-family:${font};font-size:16px;line-height:1.5;color:#55586a;">P.S. ${esc($("ePs").value.trim().replace(/^P\.?S\.?\s*/i, ""))}</p>` : "";
   return `<!DOCTYPE html>
@@ -293,7 +295,7 @@ function buildEmailHtml() {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f2f3f6;">
 <tr><td align="center" style="padding:24px 12px;">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:8px;">
-<tr><td style="background:${color};padding:20px 32px;border-radius:8px 8px 0 0;">${header}</td></tr>
+${headerRow}
 ${hero ? `<tr><td style="padding:0;"><img src="${esc(hero)}" width="600" alt="${esc($("eHead").value)}" style="display:block;width:100%;max-width:600px;height:auto;border:0;"></td></tr>` : ""}
 <tr><td style="padding:32px;">
 <h1 style="margin:0 0 20px;font-family:${head};font-size:28px;line-height:1.25;font-weight:bold;color:${color};">${esc($("eHead").value)}</h1>
@@ -449,11 +451,13 @@ async function run(e) {
     try {
       const c = await call("context", { client: state.client });
       state.context = c.context || "";
+      state.site = c.site || null;
       $("docsNote").textContent = c.sources && c.sources.length
         ? `Using this client's Project docs: ${c.sources.join(", ")}.`
         : (c.note || "");
     } catch (err) {
       state.context = "";
+      state.site = null;
       $("docsNote").textContent = `Couldn't read the client's Project docs (${err.message}). Continuing without them.`;
     }
     mark("extract", "done", state.content.title.slice(0, 40));
@@ -467,7 +471,7 @@ async function run(e) {
     mark("social", "done", `${state.posts.length * 2} examples`);
 
     current = "email"; mark("email", "running", "Writing");
-    fillEmail(await call("email", { ...base, content: state.content, posts: state.posts, context: state.context }));
+    fillEmail(await call("email", { ...base, content: state.content, posts: state.posts, context: state.context, site: state.site }));
     mark("email", "done", "Draft ready");
 
     current = "segment"; mark("segment", "running", "Choosing");
