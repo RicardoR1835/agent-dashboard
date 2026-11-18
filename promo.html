@@ -147,6 +147,7 @@
 
     <p class="empty" id="empty">Pick a client, add the content, and build. You'll get two post examples per platform, a branded HTML email and a suggested segment, all editable here before anything goes to Rodri.</p>
 
+    <p class="hint" id="docsNote"></p>
     <section class="out" id="socialOut" hidden><h2>Social posts</h2><div id="posts"></div></section>
 
     <section class="out" id="emailOut" hidden>
@@ -434,6 +435,7 @@ async function run(e) {
 
   state = { client: $("client").value, platforms };
   const base = { client: state.client, goal: $("goal").value.trim(), language: $("language").value };
+  $("docsNote").textContent = "";
   ["socialOut", "emailOut", "segmentOut", "sendOut"].forEach((id) => ($(id).hidden = true));
   $("empty").hidden = true; resetRail();
   $("run").disabled = true; $("run").textContent = "Building…";
@@ -443,22 +445,33 @@ async function run(e) {
   try {
     mark("extract", "running", "Reading");
     state.content = await call("extract", { url, text });
+    mark("extract", "running", "Reading client docs");
+    try {
+      const c = await call("context", { client: state.client });
+      state.context = c.context || "";
+      $("docsNote").textContent = c.sources && c.sources.length
+        ? `Using this client's Project docs: ${c.sources.join(", ")}.`
+        : (c.note || "");
+    } catch (err) {
+      state.context = "";
+      $("docsNote").textContent = `Couldn't read the client's Project docs (${err.message}). Continuing without them.`;
+    }
     mark("extract", "done", state.content.title.slice(0, 40));
 
     current = "social"; mark("social", "running", `Writing ${platforms.length} platforms`);
     const results = await Promise.all(platforms.map((platform) =>
-      call("social", { ...base, content: state.content, platform }).catch((err) => ({ platform, error: err.message }))));
+      call("social", { ...base, content: state.content, platform, context: state.context }).catch((err) => ({ platform, error: err.message }))));
     state.posts = results.filter((r) => !r.error);
     renderPosts(results);
     if (!state.posts.length) throw new Error("None of the social posts came back. Run it again.");
     mark("social", "done", `${state.posts.length * 2} examples`);
 
     current = "email"; mark("email", "running", "Writing");
-    fillEmail(await call("email", { ...base, content: state.content, posts: state.posts }));
+    fillEmail(await call("email", { ...base, content: state.content, posts: state.posts, context: state.context }));
     mark("email", "done", "Draft ready");
 
     current = "segment"; mark("segment", "running", "Choosing");
-    state.segment = await call("segment", { ...base, content: state.content, email: { subject_lines: subjects() }, knownSegments: $("segments").value });
+    state.segment = await call("segment", { ...base, content: state.content, email: { subject_lines: subjects() }, knownSegments: $("segments").value, context: state.context });
     $("segmentText").value = composeSegment(state.segment); $("segmentOut").hidden = false;
     mark("segment", "done", state.segment.primary ? state.segment.primary.name.slice(0, 40) : "Ready");
 
