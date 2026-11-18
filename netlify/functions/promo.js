@@ -70,6 +70,33 @@ const PROJECT_IDS = {
   OCC: "019dad45-4ac5-7394-8761-30d68683ee01", // Agency Master
 };
 
+// Each client's "06_Claude Project Docs" folder in Drive: the same docs loaded into their Claude Project.
+// The "Project docs folder" column in Client Profiles overrides these.
+const DOC_FOLDERS = {
+  TCC: "1ryPzMemMm9T2SsFIXrSce28TWWq-Z5qn",
+  "H&S": "1plxyXaRceeNC1yySoOTWOJMNx1qZgrpS",
+  Cody: "1iG5Tm9fxARjQJnqdN6N1Kqiu_sxPqnYy",
+  "Horse + Bow": "1cR2trPk17fD-PowYf3kSiBH_sms3xSMU",
+  RJD: "1XoO4WruElMOULvSFV8jPCx9Gi0Y7dT3W",
+  Continental: "1_OEhAymspyWcMO7Gzp6sG2o8y76cJVtB",
+  "Feast for a King": "1NsaP5M1uUicpKGF0F1f5fLwS5snzsrdi",
+  "White River": "1CFV5YpVIFf71p1SgPZ-uWucTztEHQY6K",
+  PSRT: "17iK5gX1vTOaHLEzYkXpw05yMjOUHEz5u",
+  "Cafe Primavera": "1GcxtpKtZJPT57zGKZBdYbUSSPdIH8qH5",
+  "Tutte al Forno": "1pksEkza-9FWHK3J8C3qKx2td1bzpGzn-",
+  Barworks: "1CTekkWvuEay3CZ0RxjA1KHyZR_JnkH9P",
+};
+// GT4 master docs (house brand guidelines) are also read for every GT4 company.
+const GT4_FOLDER = "17KBKz75TCSMUFpjr8JwtvK4ZNye5d-dX";
+const GT4_CODES = ["PSRT", "Cafe Primavera", "Tutte al Forno", "Barworks"];
+
+// Which docs to read from a folder, and how much of each (characters).
+const DOC_PICKS = [
+  { match: /brand-guidelines/i, label: "Brand guidelines", max: 9000 },
+  { match: /audience-personas/i, label: "Audience personas", max: 7000 },
+  { match: /approved-content-examples/i, label: "Approved content examples", max: 8000 },
+];
+
 const CLIENTS = Object.fromEntries(CLIENT_GROUPS.flatMap((g) => g.clients.map((c) => [c.code, c])));
 // Email domains that may be CC'd on a package (keeps the page from being usable to email anyone else).
 const ALLOWED_CC_DOMAINS = ["overcoffeeconsulting.com"];
@@ -137,8 +164,14 @@ async function profileFor(code) {
   return { base, p: p || {}, all: rows.all || {}, note };
 }
 
-function clientBlock({ base, p, all }, kind) {
+function clientBlock({ base, p, all }, kind, context) {
   const parts = [`Client: ${base.name}`];
+  if (context) {
+    parts.push(
+      "CLIENT DOCS (from the client's Claude Project). Follow their voice, language, audience and CTA guidance. If they describe output formats, our JSON format below still wins.\n\n" +
+        context
+    );
+  }
   if (base.rules) parts.push(`Rules: ${base.rules}`);
   if (p.voice) parts.push(`Voice: ${p.voice}`);
   const always = [all.always, p.always].filter(Boolean).join("\n");
@@ -227,15 +260,95 @@ const PLATFORM_RULES = {
 
 // ---------- steps ----------
 
+// ---------- client docs from Google Drive ----------
+
+const folderIdFrom = (v) => {
+  const t = String(v || "").trim();
+  const m = t.match(/folders\/([A-Za-z0-9_-]+)/);
+  return m ? m[1] : /^[A-Za-z0-9_-]{20,}$/.test(t) ? t : "";
+};
+
+async function driveList(token, folderId) {
+  const q = encodeURIComponent(`'${folderId}' in parents and trashed = false`);
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,mimeType)&pageSize=100&supportsAllDrives=true&includeItemsFromAllDrives=true`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  const data = await res.json();
+  if (!res.ok) throw new Error(`Drive: ${data.error?.message || res.status}`);
+  return data.files || [];
+}
+
+async function driveText(token, file) {
+  let url;
+  if (file.mimeType === "application/vnd.google-apps.document") {
+    url = `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=text/plain`;
+  } else if (/^text\//.test(file.mimeType) || /\.(md|txt)$/i.test(file.name)) {
+    url = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&supportsAllDrives=true`;
+  } else {
+    return ""; // PDFs and images are skipped
+  }
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  return res.ok ? (await res.text()).replace(/\n{3,}/g, "\n\n").trim() : "";
+}
+
+async function readFolder(token, folderId, picks, prefix = "") {
+  const files = await driveList(token, folderId);
+  const out = [];
+  for (const pick of picks) {
+    const file = files.find((f) => pick.match.test(f.name));
+    if (!file) continue;
+    const text = await driveText(token, file);
+    if (text.length < 200) continue; // empty placeholder docs
+    out.push({ label: prefix + pick.label, text: text.slice(0, pick.max) });
+  }
+  return out;
+}
+
+// Called once per run; the page passes the result to every writing step.
+async function context({ client }) {
+  const env = process.env;
+  if (!(env.GOOGLE_CLIENT_EMAIL && env.GOOGLE_PRIVATE_KEY)) {
+    return { context: "", sources: [], note: "Google access isn't set up yet, so the client's Project docs weren't read." };
+  }
+  let p = {};
+  try {
+    p = (await getProfiles()).rows[String(client).toLowerCase()] || {};
+  } catch (_) {}
+  const folder = folderIdFrom(p["project docs folder"]) || DOC_FOLDERS[client];
+  if (!folder) return { context: "", sources: [], note: "No Project docs folder is set for this client." };
+
+  const token = await googleToken();
+  const docs = await readFolder(token, folder, DOC_PICKS);
+  if (GT4_CODES.includes(client)) {
+    try {
+      docs.push(...(await readFolder(token, GT4_FOLDER, [{ match: /brand-guidelines/i, label: "Brand guidelines", max: 5000 }], "GT4 ")));
+    } catch (_) {}
+  }
+  if (!docs.length) {
+    return { context: "", sources: [], note: "The Project docs folder had no filled-in brand, audience or example docs." };
+  }
+  return {
+    context: docs.map((d) => `=== ${d.label} ===\n${d.text}`).join("\n\n"),
+    sources: docs.map((d) => d.label),
+    note: "",
+  };
+}
+
 async function clients() {
+  let rows = {};
+  try {
+    rows = (await getProfiles()).rows || {};
+  } catch (_) {}
+  const linkFor = (code) => {
+    const fromSheet = rows[code.toLowerCase()]?.["claude project link"] || "";
+    if (/^https:\/\/claude\.ai\/project\//i.test(fromSheet)) return fromSheet.trim();
+    return PROJECT_IDS[code] ? `https://claude.ai/project/${PROJECT_IDS[code]}` : "";
+  };
   return {
     groups: CLIENT_GROUPS.map((g) => ({
       label: g.label,
-      clients: g.clients.map(({ code, name }) => ({
-        code,
-        name,
-        projectUrl: PROJECT_IDS[code] ? `https://claude.ai/project/${PROJECT_IDS[code]}` : "",
-      })),
+      clients: g.clients.map(({ code, name }) => ({ code, name, projectUrl: linkFor(code) })),
     })),
   };
 }
@@ -274,11 +387,11 @@ async function extract({ url, text }) {
 }
 
 // 2. Two post examples for ONE platform (the page runs every platform in parallel).
-async function social({ client, content, platform, goal, language }) {
+async function social({ client, content, platform, goal, language, context }) {
   const prof = await profileFor(client);
   const system =
     "You are OverCoffee Consulting's social media writer. You turn one piece of client content into platform-native posts that drive people to it. You never invent facts, prices, dates, offers or statistics that aren't in the content.";
-  const user = `${clientBlock(prof, "social")}
+  const user = `${clientBlock(prof, "social", context)}
 ${languageLine(language)}
 Goal of the promotion: ${goal || "get people to read the content and take its next step"}
 Content URL: ${content.url || "(none, pasted content)"}
@@ -300,7 +413,7 @@ JSON shape:
 }
 
 // 3. Promo email copy. The page wraps it in the tested HTML template using the client's brand.
-async function email({ client, content, posts, goal, language }) {
+async function email({ client, content, posts, goal, language, context }) {
   const prof = await profileFor(client);
   const system =
     "You are OverCoffee Consulting's email marketer. You write short promotional emails that send subscribers to a client's new content. You never invent facts, offers, prices or dates that aren't in the content.";
@@ -308,7 +421,7 @@ async function email({ client, content, posts, goal, language }) {
     .slice(0, 2)
     .map((p) => `${p.platform}: ${String(p.variations?.[0]?.copy || "").slice(0, 300)}`)
     .join("\n");
-  const user = `${clientBlock(prof, "email")}
+  const user = `${clientBlock(prof, "email", context)}
 ${languageLine(language)}
 Goal: ${goal || "get subscribers to read the content"}
 Link the button to: ${content.url || "[ADD LINK]"}
@@ -346,11 +459,11 @@ JSON shape:
 }
 
 // 4. Who should get it. Grounded in the client's real segments when the team pastes them in.
-async function segment({ client, content, email: mail, goal, knownSegments }) {
+async function segment({ client, content, email: mail, goal, knownSegments, context }) {
   const prof = await profileFor(client);
   const system =
     "You are OverCoffee Consulting's CRM strategist. You recommend which audience segment should receive a promo email. You never invent list sizes, open rates or other numbers.";
-  const user = `${clientBlock(prof, null)}
+  const user = `${clientBlock(prof, null, context)}
 Goal: ${goal || "get subscribers to read the content"}
 Content title: ${content.title}
 Content summary: ${(content.description || content.text).slice(0, 1500)}
@@ -404,7 +517,7 @@ async function googleToken() {
   const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
   const unsigned = `${b64({ alg: "RS256", typ: "JWT" })}.${b64({
     iss: process.env.GOOGLE_CLIENT_EMAIL,
-    scope: "https://www.googleapis.com/auth/spreadsheets",
+    scope: "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.readonly",
     aud: "https://oauth2.googleapis.com/token",
     iat: now,
     exp: now + 3600,
@@ -512,7 +625,7 @@ async function notify({ client, title, url, sections, cc, emailHtml, meta = {} }
 
 // ---------- handler ----------
 
-const STEPS = { clients, extract, social, email, segment, notify };
+const STEPS = { clients, extract, context, social, email, segment, notify };
 
 exports.handler = async (event) => {
   if (event.httpMethod !== "POST") return json(405, { error: "Use POST." });
