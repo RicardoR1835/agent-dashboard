@@ -27,13 +27,21 @@ const CLIENT_GROUPS = [
   {
     label: "OverCoffee clients",
     clients: [
-      { code: "TCC", name: "Texas Cannabis Clinic", rules: "Medical cannabis clinic. No health, cure or treatment-outcome claims. No imagery of consumption. Meta and Instagram restrict cannabis promotion, so keep social posts educational and about the clinic and its process, never the product." },
-      { code: "H&S", name: "Heart & Soul Integrative Medicine", rules: "Healthcare practice. No promised outcomes or medical claims; educational, warm, trustworthy tone." },
+      { code: "TCC", name: "Texas Cannabis Clinic", rules: "Medical cannabis clinic. No health, cure or treatment-outcome claims. No imagery of consumption. Meta and Instagram restrict cannabis promotion, so keep social posts educational and about the clinic and its process, never the product.",
+        // From TCC's existing drip emails in Drive
+        brand: { color: "#1A3D2B", accent: "#1A3D2B", buttonText: "#FFFFFF", footer: "Austin, TX · texascannabisclinic.com · (512) 892-7092", unsubscribe: "{!$link.EmailAddressOptOutUrl}" } },
+      { code: "H&S", name: "Heart & Soul Integrative Medicine", rules: "Healthcare practice. No promised outcomes or medical claims; educational, warm, trustworthy tone.",
+        // Fonts from Brand Manual 2024 (Big Caslon, with Lusitana as its Google alternative; Outfit for body). Colors come from the website.
+        brand: { headingFont: "'Big Caslon', Lusitana, Georgia, 'Times New Roman', serif", bodyFont: "Outfit, Arial, Helvetica, sans-serif" } },
       { code: "Cody", name: "Cody Young Septic", rules: "Local home-services business. Plain-spoken, practical, helpful; lead with the homeowner's problem." },
       { code: "Horse + Bow", name: "Horse + Bow" },
       { code: "RJD", name: "Rachel Jackson Design" },
-      { code: "Continental", name: "Continental" },
-      { code: "Feast for a King", name: "Feast for a King" },
+      { code: "Continental", name: "Continental Caterers",
+        // Brand manual lists PMS 302 and PMS 872 (metallic); these are close web equivalents
+        brand: { color: "#003B5C", accent: "#85714D", buttonText: "#FFFFFF", footer: "475 Vandell Way, Suite A, Campbell, CA 95008" } },
+      { code: "Feast for a King", name: "Feast For a King",
+        // From BrandManual2025.pdf: green #1C362F, taupe #867766; Rosarivo headlines, Outfit body
+        brand: { color: "#1C362F", accent: "#1C362F", buttonText: "#FFFFFF", headingFont: "Rosarivo, Georgia, 'Times New Roman', serif", bodyFont: "Outfit, Arial, Helvetica, sans-serif" } },
       { code: "White River", name: "White River" },
       { code: "Burnet Chamber", name: "Burnet Chamber of Commerce" },
       { code: "Marble Falls Chamber", name: "Marble Falls Chamber of Commerce" },
@@ -45,7 +53,9 @@ const CLIENT_GROUPS = [
       { code: "PSRT", name: "PSRT" },
       { code: "Cafe Primavera", name: "Cafe Primavera" },
       { code: "Tutte al Forno", name: "Tutte al Forno" },
-      { code: "Barworks", name: "Barworks" },
+      { code: "Barworks", name: "Barworks",
+        // From ColorPaletteFinal.pdf: deep teal #023434, teal #0F797A, orange #CF6F10
+        brand: { color: "#023434", accent: "#0F797A", buttonText: "#FFFFFF", footer: "8510 Production Ave, San Diego, CA 92121 · 858-566-6077 · barworkscatering.com" } },
     ],
   },
   {
@@ -89,6 +99,20 @@ const DOC_FOLDERS = {
 // GT4 master docs (house brand guidelines) are also read for every GT4 company.
 const GT4_FOLDER = "17KBKz75TCSMUFpjr8JwtvK4ZNye5d-dX";
 const GT4_CODES = ["PSRT", "Cafe Primavera", "Tutte al Forno", "Barworks"];
+
+// Client websites, used to auto-detect colors, fonts and logo when nothing else is set.
+// A "Website" column in Client Profiles overrides these; for clients not listed, the site
+// named in their brand-guidelines doc is used.
+const WEBSITES = {
+  TCC: "https://texascannabisclinic.com",
+  Barworks: "https://barworkscatering.com",
+  Continental: "https://continentalcaterer.com",
+  "Feast for a King": "https://feastforakingcatering.com",
+  "Cafe Primavera": "https://cafeprimavera.com",
+  PSRT: "https://psrt.com",
+  "Tutte al Forno": "https://tuttealforno.com",
+  OCC: "https://overcoffeeconsulting.com",
+};
 
 // Which docs to read from a folder, and how much of each (characters).
 const DOC_PICKS = [
@@ -305,33 +329,211 @@ async function readFolder(token, folderId, picks, prefix = "") {
   return out;
 }
 
+// ---------- brand styling from the client's website ----------
+
+const hex6 = (h) => {
+  let x = String(h || "").replace("#", "").toLowerCase();
+  if (x.length === 3) x = x.split("").map((c) => c + c).join("");
+  return /^[0-9a-f]{6}$/.test(x) ? "#" + x.toUpperCase() : null;
+};
+const rgbOf = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+const lum = (h) => {
+  const [r, g, b] = rgbOf(h).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrast = (a, b) => {
+  const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m);
+  return (x + 0.05) / (y + 0.05);
+};
+const hsl = (h) => {
+  const [r, g, b] = rgbOf(h);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
+  const s = max === min ? 0 : (max - min) / (1 - Math.abs(2 * l - 1));
+  return { s, l };
+};
+const brandish = (h) => { const { s, l } = hsl(h); return s >= 0.2 && l > 0.08 && l < 0.88; };
+const distance = (a, b) => { const x = rgbOf(a), y = rgbOf(b); return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]); };
+const textOn = (bg) => (contrast(bg, "#FFFFFF") >= 4.5 ? "#FFFFFF" : "#111111");
+const darken = (h) => {
+  let [r, g, b] = rgbOf(h).map((c) => c * 255);
+  for (let i = 0; i < 20 && contrast(hex6([r, g, b].map((c) => Math.round(c).toString(16).padStart(2, "0")).join("")), "#FFFFFF") < 4.5; i++) {
+    [r, g, b] = [r, g, b].map((c) => c * 0.88);
+  }
+  return hex6([r, g, b].map((c) => Math.round(c).toString(16).padStart(2, "0")).join(""));
+};
+
+// Colors that come from page builders, WordPress or social widgets, not the brand.
+const NOT_BRAND = new Set(["#6EC1E4", "#61CE70", "#54595F", "#7A7A7A", "#0073AA", "#2271B1", "#135E96", "#3B5998", "#1DA1F2",
+  "#0077B5", "#00A0D2", "#CC1818", "#D63638", "#00A32A", "#DBA617", "#4AB866", "#3858E9", "#007CBA", "#006BA1", "#F0B849",
+  "#1E73BE", "#FF0000", "#E1306C", "#25D366", "#1877F2", "#FF6900", "#FCB900", "#7BDCB5", "#00D084", "#8ED1FC", "#0693E3",
+  "#ABB8C3", "#EB144C", "#F78DA7", "#9B51E0", "#CF2E2E"]);
+
+const SERIF = /serif|playfair|caslon|garamond|lora|merriweather|libre baskerville|cormorant|lusitana|rosarivo|dm serif|georgia|bodoni|didot|crimson|spectral|prata/i;
+const stackFor = (name) => {
+  const n = String(name || "").replace(/["']/g, "").trim();
+  if (!n) return "";
+  return SERIF.test(n) ? `'${n}', Georgia, 'Times New Roman', serif` : `'${n}', Arial, Helvetica, sans-serif`;
+};
+const IGNORE_FONTS = /^(inherit|initial|unset|sans-serif|serif|monospace|system-ui|-apple-system|blinkmacsystemfont|segoe ui|helvetica|arial|font ?awesome.*|dashicons|eicons|fa-.*|swiper-icons|star|var\(.*)$/i;
+
+async function fetchText(url, ms, max = 600000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const r = await fetch(url, { headers: { "user-agent": "Mozilla/5.0 (compatible; OverCoffeePromoBot/1.0)" }, redirect: "follow", signal: ctrl.signal });
+    return r.ok ? (await r.text()).slice(0, max) : "";
+  } catch (_) {
+    return "";
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+function styleFromPage(html, css, baseUrl) {
+  // 1. Named brand variables (Elementor, WordPress block themes, common frameworks)
+  const vars = {};
+  for (const m of css.matchAll(/--([a-z0-9-]+)\s*:\s*(#[0-9a-f]{3,6})\b/gi)) {
+    const k = m[1].toLowerCase();
+    if (!(k in vars)) vars[k] = hex6(m[2]);
+  }
+  const fromVars = (names) => names.map((n) => vars[n]).filter((h) => h && !NOT_BRAND.has(h) && brandish(h));
+  const named = fromVars(["e-global-color-primary", "wp--preset--color--primary", "primary", "color-primary", "brand-primary",
+    "e-global-color-accent", "wp--preset--color--accent", "wp--preset--color--secondary", "e-global-color-secondary",
+    "accent", "color-accent", "secondary", "color-secondary", "brand", "brand-color"]);
+  const theme = hex6((html.match(/<meta[^>]+name=["']theme-color["'][^>]+content=["'](#[0-9a-f]{3,6})/i) || [])[1]);
+
+  // 2. Most-used saturated colors in the stylesheets
+  const counts = {};
+  for (const m of css.matchAll(/#([0-9a-f]{6}|[0-9a-f]{3})\b/gi)) {
+    const h = hex6(m[1]);
+    if (h && brandish(h) && !NOT_BRAND.has(h)) counts[h] = (counts[h] || 0) + 1;
+  }
+  const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([h]) => h);
+
+  const candidates = [...new Set([...named, theme, ...ranked].filter((h) => h && brandish(h) && !NOT_BRAND.has(h)))];
+  let color = null, accent = null;
+  if (candidates.length) {
+    color = candidates.find((h) => contrast(h, "#FFFFFF") >= 4.5) || darken(candidates[0]);
+    accent = candidates.find((h) => h !== color && distance(h, color) > 0.25) || color;
+  }
+
+  // Fonts: Elementor typography vars, Google Fonts links, then the most-used font-family
+  let fonts = [];
+  const eHead = (css.match(/--e-global-typography-primary-font-family\s*:\s*["']?([^"';}]+)/i) || [])[1];
+  const eBody = (css.match(/--e-global-typography-text-font-family\s*:\s*["']?([^"';}]+)/i) || [])[1];
+  if (eHead) fonts = [eHead, eBody || eHead];
+  if (!fonts.length) {
+    for (const m of html.matchAll(/fonts\.googleapis\.com\/css2?\?([^"'\s>]+)/gi)) {
+      for (const f of m[1].replace(/&amp;/g, "&").matchAll(/family=([^&:]+)/g)) fonts.push(decodeURIComponent(f[1].replace(/\+/g, " ")).split("|")[0]);
+    }
+  }
+  if (!fonts.length) {
+    const fc = {};
+    for (const m of css.matchAll(/font-family\s*:\s*([^;}{]+)/gi)) {
+      const first = m[1].split(",")[0].replace(/["'!]|important/g, "").trim();
+      if (first && !IGNORE_FONTS.test(first)) fc[first] = (fc[first] || 0) + 1;
+    }
+    fonts = Object.entries(fc).sort((a, b) => b[1] - a[1]).map(([f]) => f).slice(0, 2);
+  }
+  fonts = [...new Set(fonts.map((f) => f.trim()).filter((f) => f && !IGNORE_FONTS.test(f)))];
+
+  // Logo: WordPress custom-logo, else the first image that says "logo"; email needs PNG/JPG, not SVG
+  let logo = "";
+  const tag =
+    (html.match(/<img[^>]+class=["'][^"']*custom-logo[^"']*["'][^>]*>/i) || [])[0] ||
+    (html.match(/<img[^>]+(?:class|id|alt|src)=["'][^"']*logo[^"']*["'][^>]*>/i) || [])[0] || "";
+  const src = (tag.match(/\s(?:data-src|src)=["']([^"']+)["']/i) || [])[1] || "";
+  if (src && !/^data:|\.svg(\?|$)/i.test(src)) {
+    try { logo = new URL(src.replace(/&amp;/g, "&"), baseUrl).href.replace(/^http:/, "https:"); } catch (_) {}
+  }
+
+  return {
+    color, accent,
+    buttonText: accent ? textOn(accent) : null,
+    headingFont: stackFor(fonts[0]),
+    bodyFont: stackFor(fonts[1] || fonts[0]),
+    logo,
+  };
+}
+
+async function siteStyle(website) {
+  const base = new URL(/^https?:\/\//i.test(website) ? website : "https://" + website);
+  const html = await fetchText(base.href, 5000);
+  if (!html) throw new Error("no page");
+  const links = [...html.matchAll(/<link[^>]+>/gi)]
+    .map((m) => m[0])
+    .filter((t) => /stylesheet/i.test(t))
+    .map((t) => (t.match(/href=["']([^"']+)["']/i) || [])[1])
+    .filter(Boolean)
+    .map((h) => { try { return new URL(h.replace(/&amp;/g, "&"), base).href; } catch (_) { return null; } })
+    .filter((u) => u && !/fonts\.googleapis|font-?awesome|dashicons|wp-block-library|jquery|swiper|animate/i.test(u));
+  const score = (u) => (/elementor\/css\/(post|global)|global|custom|theme|style/i.test(u) ? 1 : 0);
+  links.sort((a, b) => score(b) - score(a));
+  const sheets = await Promise.all(links.slice(0, 6).map((u) => fetchText(u, 3500, 400000)));
+  const inline = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map((m) => m[1]).join("\n");
+  const attrs = [...html.matchAll(/style=["']([^"']+)["']/gi)].map((m) => m[1]).join(";\n");
+  const out = styleFromPage(html, [inline, attrs, ...sheets].join("\n"), base.href);
+  return { ...out, source: base.hostname.replace(/^www\./, "") };
+}
+
+const urlish = (v) => {
+  const t = (String(v || "").trim().split(/\s+/)[0] || "").replace(/^[*\[(]+/, "").replace(/[)\].,;*]+$/, "");
+  if (!t) return "";
+  return /^https?:\/\//i.test(t) ? t : /^[a-z0-9.-]+\.[a-z]{2,}/i.test(t) ? "https://" + t : "";
+};
+
 // Called once per run; the page passes the result to every writing step.
 async function context({ client }) {
   const env = process.env;
-  if (!(env.GOOGLE_CLIENT_EMAIL && env.GOOGLE_PRIVATE_KEY)) {
-    return { context: "", sources: [], note: "Google access isn't set up yet, so the client's Project docs weren't read." };
-  }
-  let p = {};
-  try {
-    p = (await getProfiles()).rows[String(client).toLowerCase()] || {};
-  } catch (_) {}
-  const folder = folderIdFrom(p["project docs folder"]) || DOC_FOLDERS[client];
-  if (!folder) return { context: "", sources: [], note: "No Project docs folder is set for this client." };
+  const notes = [];
+  const google = env.GOOGLE_CLIENT_EMAIL && env.GOOGLE_PRIVATE_KEY;
 
-  const token = await googleToken();
-  const docs = await readFolder(token, folder, DOC_PICKS);
-  if (GT4_CODES.includes(client)) {
-    try {
-      docs.push(...(await readFolder(token, GT4_FOLDER, [{ match: /brand-guidelines/i, label: "Brand guidelines", max: 5000 }], "GT4 ")));
-    } catch (_) {}
+  let p = {};
+  if (google && env.PROMO_SHEET_ID) {
+    try { p = (await getProfiles()).rows[String(client).toLowerCase()] || {}; } catch (_) {}
   }
-  if (!docs.length) {
-    return { context: "", sources: [], note: "The Project docs folder had no filled-in brand, audience or example docs." };
+
+  // Start reading the website right away if we already know it
+  let website = urlish(p.website) || WEBSITES[client] || "";
+  let sitePromise = website ? siteStyle(website).catch(() => null) : null;
+
+  const docs = [];
+  if (google) {
+    const folder = folderIdFrom(p["project docs folder"]) || DOC_FOLDERS[client];
+    if (folder) {
+      try {
+        const token = await googleToken();
+        docs.push(...(await readFolder(token, folder, DOC_PICKS)));
+        if (GT4_CODES.includes(client)) {
+          try {
+            docs.push(...(await readFolder(token, GT4_FOLDER, [{ match: /brand-guidelines/i, label: "Brand guidelines", max: 5000 }], "GT4 ")));
+          } catch (_) {}
+        }
+      } catch (err) {
+        notes.push(`Couldn't read the Project docs (${err.message}).`);
+      }
+      if (!docs.length && !notes.length) notes.push("The Project docs folder had no filled-in brand, audience or example docs.");
+    } else {
+      notes.push("No Project docs folder is set for this client.");
+    }
+  } else {
+    notes.push("Google access isn't set up yet, so the client's Project docs weren't read.");
   }
+
+  // No website on file? Use the one named in the brand guidelines doc.
+  if (!website) {
+    const brandDoc = (docs.find((d) => d.label === "Brand guidelines") || {}).text || "";
+    website = urlish((brandDoc.match(/website[^:\n]*:\**\s*\[?((?:https?:\/\/)?[a-z0-9.-]+\.[a-z]{2,}[^\s\])]*)/i) || [])[1]);
+    if (website) sitePromise = siteStyle(website).catch(() => null);
+  }
+  const site = sitePromise ? await sitePromise : null;
+
   return {
     context: docs.map((d) => `=== ${d.label} ===\n${d.text}`).join("\n\n"),
     sources: docs.map((d) => d.label),
-    note: "",
+    note: notes.join(" "),
+    website,
+    site,
   };
 }
 
@@ -413,7 +615,7 @@ JSON shape:
 }
 
 // 3. Promo email copy. The page wraps it in the tested HTML template using the client's brand.
-async function email({ client, content, posts, goal, language, context }) {
+async function email({ client, content, posts, goal, language, context, site }) {
   const prof = await profileFor(client);
   const system =
     "You are OverCoffee Consulting's email marketer. You write short promotional emails that send subscribers to a client's new content. You never invent facts, offers, prices or dates that aren't in the content.";
@@ -438,22 +640,40 @@ Write one promo email: 3 subject line options (under 50 characters, no clickbait
 JSON shape:
 {"subject_lines":["","",""],"preheader":"","headline":"","body":"","cta_text":"","cta_url":"","ps":""}`;
   const copy = await claudeJSON(system, user, 1000);
-  const { base, p, note } = prof;
-  const fallback = { ...DEFAULT_BRAND, ...(base.brand || {}) };
+  const { base, p } = prof;
+  const code = base.brand || {};
+  const web = site || {};
+
+  // Priority for every field: Client Profiles sheet > built-in brand (from Drive) > client website > OverCoffee default
+  const firstColor = (...vals) => vals.map((v) => hex6(v)).find(Boolean);
+  const headerColor = firstColor(p["header color"], code.color, web.color, DEFAULT_BRAND.color);
+  let accent, buttonText;
+  if (hex6(p["button color"])) { accent = hex6(p["button color"]); buttonText = hex6(p["button text color"]) || textOn(accent); }
+  else if (hex6(code.accent)) { accent = hex6(code.accent); buttonText = hex6(code.buttonText) || textOn(accent); }
+  else if (hex6(web.accent)) { accent = hex6(web.accent); buttonText = web.buttonText || textOn(accent); }
+  else { accent = DEFAULT_BRAND.accent; buttonText = DEFAULT_BRAND.buttonText; }
+  const logo = [p["logo url"], code.logo, web.logo].find((v) => /^https:\/\//i.test(v || "")) || "";
+
+  let styleNote;
+  if (hex6(p["header color"]) || hex6(p["button color"])) styleNote = "Styling: from the Client Profiles sheet.";
+  else if (hex6(code.color)) styleNote = "Styling: this client's brand colors from Drive.";
+  else if (web.color) styleNote = `Styling: picked up automatically from ${web.source}. Check it in the preview; to lock in different colors, fill in the color columns in Client Profiles.`;
+  else styleNote = "Styling: no brand colors found, so OverCoffee's defaults were used. Add this client's colors in Client Profiles.";
+
   return {
     ...copy,
     cta_url: copy.cta_url || content.url || "",
-    profileNote: note,
+    profileNote: styleNote,
     brand: {
       name: base.name,
-      color: color(p["header color"], fallback.color),
-      accent: color(p["button color"], fallback.accent),
-      buttonText: color(p["button text color"], fallback.buttonText),
-      logo: /^https:\/\//i.test(p["logo url"] || "") ? p["logo url"] : fallback.logo,
-      headingFont: fontStack(p["heading font"]),
-      bodyFont: fontStack(p["body font"]),
-      footer: p.footer || "",
-      unsubscribe: p["unsubscribe link"] || "",
+      color: headerColor,
+      accent,
+      buttonText,
+      logo,
+      headingFont: fontStack(p["heading font"] || code.headingFont || web.headingFont),
+      bodyFont: fontStack(p["body font"] || code.bodyFont || web.bodyFont),
+      footer: p.footer || code.footer || "",
+      unsubscribe: p["unsubscribe link"] || code.unsubscribe || "",
     },
   };
 }
