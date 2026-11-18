@@ -153,6 +153,7 @@
       <h2>Promo email</h2>
       <div class="emailgrid">
         <div class="card">
+          <p class="hint" id="profileNote"></p>
           <label for="eSubjects">Subject line options</label>
           <p class="hint">The first line is used in the HTML.</p>
           <textarea id="eSubjects" rows="3"></textarea>
@@ -162,6 +163,9 @@
           <label for="eCta">Button text</label><input id="eCta" type="text">
           <label for="eUrl">Button link</label><input id="eUrl" type="url">
           <label for="ePs">P.S.</label><input id="ePs" type="text">
+          <label for="eHero">Hero image link (optional)</label>
+          <p class="hint">A hosted JPG or PNG (https://), about 1200px wide. Shows full width under the header.</p>
+          <input id="eHero" type="url" placeholder="https://">
         </div>
         <div>
           <iframe class="preview" id="preview" title="Email preview" sandbox=""></iframe>
@@ -180,7 +184,12 @@
     </section>
 
     <section class="out send" id="sendOut" hidden>
-      <div class="row"><button type="button" id="sendBtn">Email Rodri</button><span id="sendStatus"></span></div>
+      <div class="row">
+        <button type="button" id="sendBtn">Email Rodri</button>
+        <button type="button" id="refineBtn">Refine in Claude</button>
+        <span id="sendStatus"></span>
+      </div>
+      <p class="hint" id="refineHint">Copies the whole package and opens this client's Claude Project. Paste it there and ask for changes.</p>
       <div id="sendWarn"></div>
     </section>
   </main>
@@ -189,6 +198,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const PROJECTS = {};
 const FALLBACK_GROUPS = [{ label: "Clients", clients: [{ code: "OCC", name: "OverCoffee Consulting" }] }];
 let state = {};
 
@@ -247,7 +257,7 @@ function renderPosts(results) {
 }
 
 // ---------- email ----------
-const FIELDS = ["eSubjects", "ePre", "eHead", "eBody", "eCta", "eUrl", "ePs"];
+const FIELDS = ["eSubjects", "ePre", "eHead", "eBody", "eCta", "eUrl", "ePs", "eHero"];
 
 function subjects() {
   return $("eSubjects").value.split("\n").map((s) => s.replace(/^\s*\d+[.)]\s*/, "").trim()).filter(Boolean);
@@ -256,14 +266,17 @@ function subjects() {
 function buildEmailHtml() {
   const b = state.brand || {};
   const color = b.color || "#191a2e", accent = b.accent || "#c9a84c", btnText = b.buttonText || "#191a2e";
-  const font = "Arial,Helvetica,sans-serif";
+  const head = b.headingFont || "Arial, Helvetica, sans-serif";
+  const font = b.bodyFont || "Arial, Helvetica, sans-serif";
+  const hero = /^https:\/\//i.test($("eHero").value.trim()) ? $("eHero").value.trim() : "";
+  const unsubLabel = $("language").value === "Spanish" ? "Cancelar suscripción" : "Unsubscribe";
   const lang = $("language").value === "Spanish" ? "es" : "en";
   const link = /^https?:\/\//i.test($("eUrl").value.trim()) ? $("eUrl").value.trim() : "#";
   const paras = $("eBody").value.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean)
     .map((p) => `<p style="margin:0 0 18px;font-family:${font};font-size:18px;line-height:1.5;color:#2b2b2b;">${esc(p).replace(/\n/g, "<br>")}</p>`).join("\n");
   const header = b.logo
     ? `<img src="${esc(b.logo)}" alt="${esc(b.name)}" height="40" style="display:block;height:40px;width:auto;border:0;">`
-    : `<span style="font-family:${font};font-size:20px;font-weight:bold;color:#ffffff;">${esc(b.name)}</span>`;
+    : `<span style="font-family:${head};font-size:20px;font-weight:bold;color:#ffffff;">${esc(b.name)}</span>`;
   const ps = $("ePs").value.trim()
     ? `<p style="margin:0;font-family:${font};font-size:16px;line-height:1.5;color:#55586a;">P.S. ${esc($("ePs").value.trim().replace(/^P\.?S\.?\s*/i, ""))}</p>` : "";
   return `<!DOCTYPE html>
@@ -280,15 +293,16 @@ function buildEmailHtml() {
 <tr><td align="center" style="padding:24px 12px;">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:8px;">
 <tr><td style="background:${color};padding:20px 32px;border-radius:8px 8px 0 0;">${header}</td></tr>
+${hero ? `<tr><td style="padding:0;"><img src="${esc(hero)}" width="600" alt="${esc($("eHead").value)}" style="display:block;width:100%;max-width:600px;height:auto;border:0;"></td></tr>` : ""}
 <tr><td style="padding:32px;">
-<h1 style="margin:0 0 20px;font-family:${font};font-size:28px;line-height:1.25;font-weight:bold;color:${color};">${esc($("eHead").value)}</h1>
+<h1 style="margin:0 0 20px;font-family:${head};font-size:28px;line-height:1.25;font-weight:bold;color:${color};">${esc($("eHead").value)}</h1>
 ${paras}
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 28px;"><tr>
 <td style="border-radius:6px;background:${accent};"><a href="${esc(link)}" target="_blank" style="display:inline-block;padding:14px 28px;font-family:${font};font-size:18px;font-weight:bold;color:${btnText};text-decoration:none;border-radius:6px;">${esc($("eCta").value)}</a></td>
 </tr></table>
 ${ps}
 </td></tr>
-<tr><td style="padding:20px 32px;border-top:1px solid #e5e6eb;font-family:${font};font-size:16px;line-height:1.5;color:#6b6e80;">${esc(b.name)}<!-- Your email platform adds the mailing address and unsubscribe link here --></td></tr>
+<tr><td style="padding:20px 32px;border-top:1px solid #e5e6eb;font-family:${font};font-size:16px;line-height:1.5;color:#6b6e80;">${esc(b.name)}${b.footer ? "<br>" + esc(b.footer).replace(/\n/g, "<br>") : ""}${b.unsubscribe ? `<br><a href="${esc(b.unsubscribe)}" style="color:#6b6e80;text-decoration:underline;">${unsubLabel}</a>` : "<!-- Add the unsubscribe link from your sending platform here -->"}</td></tr>
 </table>
 </td></tr>
 </table>
@@ -312,6 +326,8 @@ function fillEmail(m) {
   $("eCta").value = m.cta_text || "";
   $("eUrl").value = m.cta_url || "";
   $("ePs").value = m.ps || "";
+  $("eHero").value = "";
+  $("profileNote").textContent = m.profileNote || "";
   $("preview").srcdoc = buildEmailHtml();
   $("emailOut").hidden = false;
 }
@@ -354,6 +370,29 @@ function packageSections() {
   });
   sections.push({ heading: "Suggested segment", items: [$("segmentText").value] });
   return sections;
+}
+
+function packageText() {
+  const lines = [`Promo package for ${$("client").selectedOptions[0].textContent}. Help me refine it.`];
+  packageSections().forEach((sec) => {
+    if (sec.heading === "Promo email") {
+      lines.push("== Promo email ==\n\n" + [
+        "Subject line options:\n" + subjects().map((x, i) => `${i + 1}. ${x}`).join("\n"),
+        `Preheader: ${$("ePre").value}`, `Headline: ${$("eHead").value}`, $("eBody").value,
+        `Button: ${$("eCta").value} (${$("eUrl").value})`, $("ePs").value ? `P.S. ${$("ePs").value}` : "",
+      ].filter(Boolean).join("\n\n"));
+    } else {
+      lines.push(`== ${sec.heading} ==\n\n${sec.items.join("\n\n---\n\n")}`);
+    }
+  });
+  return lines.join("\n\n");
+}
+
+async function refineInClaude(e) {
+  const url = PROJECTS[state.client];
+  try { await navigator.clipboard.writeText(packageText()); } catch {}
+  if (url) { window.open(url, "_blank", "noopener"); flash(e.target, "Copied, paste it in the Project"); }
+  else flash(e.target, "Copied (no Project for this client)");
 }
 
 async function sendToRodri() {
@@ -439,13 +478,17 @@ async function loadClients() {
   const sel = $("client"); sel.innerHTML = "";
   groups.forEach((g) => {
     const og = document.createElement("optgroup"); og.label = g.label;
-    g.clients.forEach((c) => { const o = document.createElement("option"); o.value = c.code; o.textContent = c.name; og.append(o); });
+    g.clients.forEach((c) => {
+      PROJECTS[c.code] = c.projectUrl || "";
+      const o = document.createElement("option"); o.value = c.code; o.textContent = c.name; og.append(o);
+    });
     sel.append(og);
   });
 }
 
 $("f").addEventListener("submit", run);
 $("sendBtn").addEventListener("click", sendToRodri);
+$("refineBtn").addEventListener("click", refineInClaude);
 ["url", "text"].forEach((id) => $(id).addEventListener("input", () => ($("formError").textContent = "")));
 loadClients();
 </script>
