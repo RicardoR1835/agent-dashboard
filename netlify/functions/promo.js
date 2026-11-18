@@ -14,6 +14,7 @@
 //   GOOGLE_PRIVATE_KEY    service account private_key (paste as-is, \n sequences are fine)
 //   PROMO_SHEET_ID        the Promo Log sheet's ID (the long part of its URL)
 //   PROMO_SHEET_TAB       optional, defaults to "Promo Log"
+//   PROFILES_TAB          optional, defaults to "Client Profiles" (same sheet: styling, voice, examples per client)
 //   SLACK_WEBHOOK_URL     optional
 
 const crypto = require("crypto");
@@ -53,11 +54,28 @@ const CLIENT_GROUPS = [
   },
 ];
 
+// Claude Project for each client, used by the "Refine in Claude" button.
+const PROJECT_IDS = {
+  TCC: "019d7d60-d2df-719a-aea4-93eb0d506f52",
+  "Horse + Bow": "019dacb8-233d-742d-8d0d-62e04d9db806",
+  Cody: "019dacc9-0f9d-7096-b3aa-4573e4772658",
+  "H&S": "019d8840-8397-75a8-8d9f-9775c93e65e4",
+  "Tutte al Forno": "019dfe3f-8f27-7325-9fd4-cac4b9058ed7",
+  RJD: "019dacb1-586b-77ec-869a-70bd25cae2ba",
+  "Cafe Primavera": "019dacaa-d1fc-76eb-afc7-4cbe1fa493f5",
+  PSRT: "019d9bf8-83de-7358-b95d-70b9c2e8c302",
+  Barworks: "019d9bec-e197-729b-adf8-98a6ae98b58c",
+  Continental: "019d884f-c64f-7044-9429-52b9b92c443c",
+  "Feast for a King": "019d883b-230c-7697-8e97-b0894aa59f64",
+  OCC: "019dad45-4ac5-7394-8761-30d68683ee01", // Agency Master
+};
+
 const CLIENTS = Object.fromEntries(CLIENT_GROUPS.flatMap((g) => g.clients.map((c) => [c.code, c])));
 // Email domains that may be CC'd on a package (keeps the page from being usable to email anyone else).
 const ALLOWED_CC_DOMAINS = ["overcoffeeconsulting.com"];
 
 const DEFAULT_BRAND = { color: "#191a2e", accent: "#c9a84c", buttonText: "#191a2e", logo: "" };
+const DEFAULT_FONT = "Arial, Helvetica, sans-serif";
 
 // ---------- helpers ----------
 
@@ -69,10 +87,79 @@ const json = (statusCode, body) => ({
 
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-function clientBlock(code) {
-  const c = CLIENTS[code] || { name: code };
-  return [`Client: ${c.name}`, c.rules ? `Rules: ${c.rules}` : ""].filter(Boolean).join("\n");
+// ---------- client profiles (Google Sheet tab) ----------
+// Header row (any order, case doesn't matter):
+// Client | Header color | Button color | Button text color | Logo URL | Heading font | Body font | Footer |
+// Unsubscribe link | Voice | Always | Never | Example post 1 | Example post 2 | Example email
+// A row with Client = ALL holds house rules (Always / Never) that apply to every client.
+
+let profileCache = { at: 0, rows: null };
+
+async function getProfiles() {
+  const env = process.env;
+  if (!(env.GOOGLE_CLIENT_EMAIL && env.GOOGLE_PRIVATE_KEY && env.PROMO_SHEET_ID)) {
+    return { rows: {}, note: "The Client Profiles sheet isn't connected yet, so default styling and voice were used." };
+  }
+  if (profileCache.rows && Date.now() - profileCache.at < 60000) return { rows: profileCache.rows };
+  const token = await googleToken();
+  const tab = env.PROFILES_TAB || "Client Profiles";
+  const res = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${env.PROMO_SHEET_ID}/values/${encodeURIComponent(tab + "!A1:Z300")}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  const data = await res.json();
+  if (!res.ok) throw new Error(`Client Profiles: ${data.error?.message || res.status}.`);
+  const [header = [], ...lines] = data.values || [];
+  const keys = header.map((h) => String(h).trim().toLowerCase());
+  const rows = {};
+  for (const line of lines) {
+    const row = {};
+    keys.forEach((k, i) => (row[k] = String(line[i] ?? "").trim()));
+    if (row.client) rows[row.client.toLowerCase()] = row;
+  }
+  profileCache = { at: Date.now(), rows };
+  return { rows };
 }
+
+async function profileFor(code) {
+  const base = CLIENTS[code] || { code, name: code };
+  let rows = {};
+  let note = "";
+  try {
+    const r = await getProfiles();
+    rows = r.rows;
+    note = r.note || "";
+  } catch (err) {
+    note = `${err.message} Default styling and voice were used.`;
+  }
+  const p = rows[String(code).toLowerCase()];
+  if (!note && !p) note = `There's no row for "${code}" in Client Profiles yet, so default styling and voice were used.`;
+  return { base, p: p || {}, all: rows.all || {}, note };
+}
+
+function clientBlock({ base, p, all }, kind) {
+  const parts = [`Client: ${base.name}`];
+  if (base.rules) parts.push(`Rules: ${base.rules}`);
+  if (p.voice) parts.push(`Voice: ${p.voice}`);
+  const always = [all.always, p.always].filter(Boolean).join("\n");
+  const never = [all.never, p.never].filter(Boolean).join("\n");
+  if (always) parts.push(`Always:\n${always}`);
+  if (never) parts.push(`Never:\n${never}`);
+  const examples =
+    kind === "social" ? [p["example post 1"], p["example post 2"]].filter(Boolean)
+    : kind === "email" ? [p["example email"]].filter(Boolean)
+    : [];
+  if (examples.length) {
+    parts.push(
+      "Approved examples from this client. Match their voice, rhythm, length and formatting. Do not reuse their facts or offers:\n" +
+        examples.map((e, i) => `--- Example ${i + 1} ---\n${e}`).join("\n")
+    );
+  }
+  return parts.join("\n\n");
+}
+
+const color = (v, fallback) => (/^#[0-9a-f]{3,8}$/i.test(String(v || "").trim()) ? String(v).trim() : fallback);
+const fontStack = (v) => String(v || "").replace(/["<>;{}]/g, "").trim() || DEFAULT_FONT;
 
 function languageLine(language) {
   return language === "Spanish"
@@ -141,7 +228,16 @@ const PLATFORM_RULES = {
 // ---------- steps ----------
 
 async function clients() {
-  return { groups: CLIENT_GROUPS.map((g) => ({ label: g.label, clients: g.clients.map(({ code, name }) => ({ code, name })) })) };
+  return {
+    groups: CLIENT_GROUPS.map((g) => ({
+      label: g.label,
+      clients: g.clients.map(({ code, name }) => ({
+        code,
+        name,
+        projectUrl: PROJECT_IDS[code] ? `https://claude.ai/project/${PROJECT_IDS[code]}` : "",
+      })),
+    })),
+  };
 }
 
 // 1. Read the content: a URL (blog post, landing page) or pasted text.
@@ -179,9 +275,10 @@ async function extract({ url, text }) {
 
 // 2. Two post examples for ONE platform (the page runs every platform in parallel).
 async function social({ client, content, platform, goal, language }) {
+  const prof = await profileFor(client);
   const system =
     "You are OverCoffee Consulting's social media writer. You turn one piece of client content into platform-native posts that drive people to it. You never invent facts, prices, dates, offers or statistics that aren't in the content.";
-  const user = `${clientBlock(client)}
+  const user = `${clientBlock(prof, "social")}
 ${languageLine(language)}
 Goal of the promotion: ${goal || "get people to read the content and take its next step"}
 Content URL: ${content.url || "(none, pasted content)"}
@@ -204,13 +301,14 @@ JSON shape:
 
 // 3. Promo email copy. The page wraps it in the tested HTML template using the client's brand.
 async function email({ client, content, posts, goal, language }) {
+  const prof = await profileFor(client);
   const system =
     "You are OverCoffee Consulting's email marketer. You write short promotional emails that send subscribers to a client's new content. You never invent facts, offers, prices or dates that aren't in the content.";
   const angle = (posts || [])
     .slice(0, 2)
     .map((p) => `${p.platform}: ${String(p.variations?.[0]?.copy || "").slice(0, 300)}`)
     .join("\n");
-  const user = `${clientBlock(client)}
+  const user = `${clientBlock(prof, "email")}
 ${languageLine(language)}
 Goal: ${goal || "get subscribers to read the content"}
 Link the button to: ${content.url || "[ADD LINK]"}
@@ -227,15 +325,32 @@ Write one promo email: 3 subject line options (under 50 characters, no clickbait
 JSON shape:
 {"subject_lines":["","",""],"preheader":"","headline":"","body":"","cta_text":"","cta_url":"","ps":""}`;
   const copy = await claudeJSON(system, user, 1000);
-  const c = CLIENTS[client] || { name: client };
-  return { ...copy, cta_url: copy.cta_url || content.url || "", brand: { ...DEFAULT_BRAND, ...(c.brand || {}), name: c.name } };
+  const { base, p, note } = prof;
+  const fallback = { ...DEFAULT_BRAND, ...(base.brand || {}) };
+  return {
+    ...copy,
+    cta_url: copy.cta_url || content.url || "",
+    profileNote: note,
+    brand: {
+      name: base.name,
+      color: color(p["header color"], fallback.color),
+      accent: color(p["button color"], fallback.accent),
+      buttonText: color(p["button text color"], fallback.buttonText),
+      logo: /^https:\/\//i.test(p["logo url"] || "") ? p["logo url"] : fallback.logo,
+      headingFont: fontStack(p["heading font"]),
+      bodyFont: fontStack(p["body font"]),
+      footer: p.footer || "",
+      unsubscribe: p["unsubscribe link"] || "",
+    },
+  };
 }
 
 // 4. Who should get it. Grounded in the client's real segments when the team pastes them in.
 async function segment({ client, content, email: mail, goal, knownSegments }) {
+  const prof = await profileFor(client);
   const system =
     "You are OverCoffee Consulting's CRM strategist. You recommend which audience segment should receive a promo email. You never invent list sizes, open rates or other numbers.";
-  const user = `${clientBlock(client)}
+  const user = `${clientBlock(prof, null)}
 Goal: ${goal || "get subscribers to read the content"}
 Content title: ${content.title}
 Content summary: ${(content.description || content.text).slice(0, 1500)}
@@ -309,7 +424,7 @@ async function googleToken() {
 async function logToSheet(row) {
   const tab = process.env.PROMO_SHEET_TAB || "Promo Log";
   const token = await googleToken();
-  const range = encodeURIComponent(`${tab}!A:J`);
+  const range = encodeURIComponent(`${tab}!A:L`);
   const res = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${process.env.PROMO_SHEET_ID}/values/${range}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
     {
@@ -371,7 +486,9 @@ async function notify({ client, title, url, sections, cc, emailHtml, meta = {} }
         meta.segment || "",
         ccList.join(", "),
         out.emailed ? "Sent to Rodri" : "Not emailed",
-        "",
+        "", // Notes
+        "", // Result (Rodri fills in: Used as-is / Light edit / Rewrote / Didn't use)
+        "", // What we changed
       ]);
       out.logged = true;
     } catch (err) {
