@@ -158,8 +158,8 @@
     <textarea id="segments" rows="3"></textarea>
 
     <label for="cc">Send a copy to</label>
-    <p class="hint">Optional. Your email, so Rodri can reply to you.</p>
-    <input id="cc" type="text" placeholder="you@overcoffeeconsulting.com">
+    <p class="hint">You're copied automatically. Add other @overcoffeeconsulting.com addresses here, separated by commas.</p>
+    <input id="cc" type="text" placeholder="name@overcoffeeconsulting.com">
 
     <label class="inline" style="margin-top:1rem"><input type="checkbox" id="autoping" checked> Email Rodri when it's ready</label>
 
@@ -465,7 +465,7 @@ async function sendToRodri() {
       },
     });
     const bits = [];
-    if (r.emailed) bits.push("Emailed Rodri");
+    if (r.emailed) bits.push("Emailed Rodri" + (r.copied && r.copied.length ? ` (copied ${r.copied.join(", ")})` : ""));
     if (r.logged) bits.push("Logged in sheet");
     if (r.slack) bits.push("Slack posted");
     mark("notify", r.emailed ? "done" : "failed", bits.join(", ") || "Not sent");
@@ -474,7 +474,8 @@ async function sendToRodri() {
       // Sending again updates this same task instead of creating another one
       linkedTaskId = r.task.taskId;
       const s = document.createElement("span"); s.className = "ok";
-      s.innerHTML = ` ${r.task.created ? "Created" : "Updated"} task <a href="${esc(r.task.url)}" target="_blank" rel="noopener">${esc(r.task.taskId)}</a> in the Task Hub.`;
+      s.innerHTML = ` ${r.task.created ? "Created" : "Updated"} task <a href="${esc(r.task.url)}" target="_blank" rel="noopener">${esc(r.task.taskId)}</a> in the Task Hub.` +
+        (r.task.packageUrl ? ` <a href="${esc(r.task.packageUrl)}" target="_blank" rel="noopener">Open the saved package</a>.` : "");
       $("sendStatus").append(s);
     }
     (r.warnings || []).forEach((w) => { const d = document.createElement("div"); d.className = "warn"; d.textContent = w; $("sendWarn").append(d); });
