@@ -110,4 +110,25 @@ async function appendRow(tab, values) {
   );
 }
 
-module.exports = { googleReady, googleToken, privateKey, readTab, writeRow, appendRow };
+// Creates a tab with a header row if it doesn't exist yet. Safe to call every time.
+async function ensureTab(tab, header) {
+  const token = await googleToken();
+  const base = `https://sheets.googleapis.com/v4/spreadsheets/${process.env.PROMO_SHEET_ID}`;
+  const meta = await (await fetch(`${base}?fields=sheets.properties.title`, { headers: { Authorization: `Bearer ${token}` } })).json();
+  const exists = (meta.sheets || []).some((s) => s.properties && s.properties.title === tab);
+  if (exists) return false;
+  const res = await fetch(`${base}:batchUpdate`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ requests: [{ addSheet: { properties: { title: tab } } }] }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    if (!/already exists/i.test(data.error?.message || "")) throw new Error(`Couldn't create the ${tab} tab: ${data.error?.message || res.status}`);
+    return false;
+  }
+  await writeRow(tab, 1, header);
+  return true;
+}
+
+module.exports = { googleReady, googleToken, privateKey, readTab, writeRow, appendRow, ensureTab };
