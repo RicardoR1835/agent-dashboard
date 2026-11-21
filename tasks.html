@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Task Hub · OverCoffee</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #191a2e; --gold: #c9a84c;
+    --bg: #f3f4f7; --surface: #ffffff; --ink: #191a2e; --muted: #555872; --line: #d8dae3;
+    --accent: #8a6d1f; --accent-soft: #f6efdb; --danger: #a12d2d; --danger-soft: #fbeaea; --ok: #2f6b3a; --ok-soft: #e6f2e8;
+    --info: #24527a; --info-soft: #e5eef7; --warn: #7a5300; --warn-soft: #fbf0d6;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11121d; --surface: #1b1c2c; --ink: #ecebe6; --muted: #a6a8bb; --line: #33354b;
+      --accent: #d9bb6a; --accent-soft: #2c2918; --danger: #f09a9a; --danger-soft: #3a1d1f; --ok: #8fd19a; --ok-soft: #1c3121;
+      --info: #9cc4ec; --info-soft: #1b2a3c; --warn: #f0c96a; --warn-soft: #3a2f14;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 400 1rem/1.5 "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { background: var(--navy); color: #f3f1ea; padding: 1rem 1.5rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+  header h1 { margin: 0 auto 0 0; font-size: 1.25rem; font-weight: 600; }
+  header h1 span { color: var(--gold); }
+  header nav { display: flex; gap: 1rem; font-size: .95rem; }
+  header a { color: #f3f1ea; }
+  header .me { font-size: .95rem; display: flex; align-items: center; gap: .5rem; }
+  header .me button { background: transparent; color: #f3f1ea; border-color: #4a4c66; padding: .3rem .6rem; }
+  main { max-width: 1360px; margin: 0 auto; padding: 1.25rem 1.5rem 3rem; }
+  button { font: inherit; font-weight: 500; border-radius: 8px; cursor: pointer; padding: .5rem .85rem; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+  button.primary { background: var(--navy); color: #fff; border-color: var(--navy); }
+  @media (prefers-color-scheme: dark) { button.primary { background: var(--gold); color: #191a2e; border-color: var(--gold); } }
+  button:disabled { opacity: .55; cursor: wait; }
+  button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  input, select { padding: .5rem .65rem; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; }
+  label { font-weight: 500; }
+
+  .gate { max-width: 420px; margin: 4rem auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 1.5rem; }
+  .gate h2 { margin: 0 0 .25rem; font-size: 1.2rem; font-weight: 600; }
+  .gate p { color: var(--muted); margin: 0 0 1rem; }
+  .gate input { width: 100%; margin: .35rem 0 1rem; }
+  .gate .names { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: .5rem; }
+  .error { color: var(--danger); font-size: .9rem; min-height: 1.2em; margin: .5rem 0 0; }
+
+  .bar { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 1rem; }
+  .tabs { display: flex; gap: .25rem; margin-right: auto; }
+  .tabs button { border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; color: var(--muted); padding: .6rem .8rem; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--gold); }
+  .bar .meta { color: var(--muted); font-size: .875rem; }
+  .filters { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; align-items: center; }
+  .warnings { background: var(--warn-soft); color: var(--warn); border-radius: 8px; padding: .6rem .9rem; font-size: .9rem; margin-bottom: 1rem; }
+  .warnings summary { cursor: pointer; font-weight: 500; }
+  .warnings ul { margin: .4rem 0 0; padding-left: 1.2rem; }
+  .fail { background: var(--danger-soft); color: var(--danger); border-radius: 8px; padding: .8rem 1rem; }
+
+  .group { margin-bottom: 1.5rem; }
+  .group h2 { font-size: 1rem; font-weight: 600; margin: 0 0 .5rem; display: flex; gap: .5rem; align-items: baseline; }
+  .group h2 small { color: var(--muted); font-weight: 400; font-size: .875rem; }
+  .group.late h2 { color: var(--danger); }
+  .list { display: grid; gap: .4rem; }
+  .task { display: grid; grid-template-columns: minmax(0, 1fr) auto auto 8.5rem; gap: .75rem; align-items: center; width: 100%; text-align: left; padding: .65rem .85rem; font-weight: 400; }
+  .task:hover { border-color: var(--muted); }
+  .task .title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .task .when { font-size: .875rem; color: var(--muted); text-align: right; }
+  .task .when.late, .card .when.late { color: var(--danger); font-weight: 500; }
+  .task.late { border-left: 4px solid var(--danger); }
+  @media (max-width: 720px) {
+    .task { grid-template-columns: 1fr auto; }
+    .task .title { grid-column: 1 / -1; white-space: normal; }
+    .task .when { text-align: left; }
+  }
+  .chip { display: inline-block; font-size: .8rem; padding: .1rem .5rem; border-radius: 6px; background: var(--bg); color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+  .chip.type { background: transparent; color: var(--accent); border-color: var(--accent); font-weight: 500; }
+  .chip.flag { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
+  .pill { display: inline-block; font-size: .8rem; font-weight: 500; padding: .15rem .55rem; border-radius: 999px; white-space: nowrap; background: var(--bg); color: var(--muted); }
+  .pill[data-s="In progress"] { background: var(--accent-soft); color: var(--accent); }
+  .pill[data-s="Needs review"] { background: var(--warn-soft); color: var(--warn); }
+  .pill[data-s="Changes requested"] { background: var(--danger-soft); color: var(--danger); }
+  .pill[data-s="Scheduled"] { background: var(--info-soft); color: var(--info); }
+  .pill[data-s="Published"] { background: var(--ok-soft); color: var(--ok); }
+
+  .board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(220px, 1fr); gap: .75rem; overflow-x: auto; padding-bottom: .5rem; }
+  .col { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: .6rem; min-width: 0; align-self: start; }
+  .col h2 { font-size: .9rem; font-weight: 600; margin: .1rem .25rem .6rem; display: flex; justify-content: space-between; }
+  .col h2 span { color: var(--muted); font-weight: 400; }
+  .card { display: block; width: 100%; text-align: left; padding: .6rem .7rem; margin-bottom: .4rem; background: var(--bg); font-weight: 400; }
+  .card .title { font-weight: 500; display: block; margin-bottom: .35rem; line-height: 1.3; }
+  .card .row { display: flex; gap: .3rem; flex-wrap: wrap; margin-bottom: .35rem; }
+  .card .when { font-size: .8rem; color: var(--muted); }
+  .card.late { border-left: 4px solid var(--danger); }
+  .col .none { color: var(--muted); font-size: .875rem; margin: .25rem; }
+
+  .empty { color: var(--muted); padding: 2rem 0; max-width: 60ch; }
+  .closed .task .when { color: var(--ink); }
+
+  dialog { border: 1px solid var(--line); border-radius: 12px; padding: 0; width: min(720px, calc(100% - 2rem)); background: var(--surface); color: var(--ink); }
+  dialog::backdrop { background: rgba(17, 18, 29, .55); }
+  .dlg-head { padding: 1.1rem 1.25rem .9rem; border-bottom: 1px solid var(--line); display: flex; gap: 1rem; align-items: start; }
+  .dlg-head h2 { margin: 0; font-size: 1.15rem; font-weight: 600; }
+  .dlg-head p { margin: .2rem 0 0; color: var(--muted); font-size: .9rem; }
+  .dlg-head button { margin-left: auto; }
+  .dlg-body { padding: 1rem 1.25rem 1.25rem; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .75rem 1rem; margin: 0 0 1rem; }
+  .facts div { min-width: 0; }
+  .facts dt, .field h3 { font-size: .8rem; color: var(--muted); margin: 0 0 .1rem; font-weight: 500; }
+  .facts dd { margin: 0; overflow-wrap: anywhere; }
+  .field { margin-bottom: .9rem; }
+  .field p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .field a { color: var(--accent); overflow-wrap: anywhere; }
+  .linked { display: grid; gap: .35rem; }
+  .linked button { text-align: left; font-weight: 400; display: flex; justify-content: space-between; gap: .5rem; }
+  .note { font-size: .875rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: .8rem; margin: 1rem 0 0; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+</head>
+<body>
+<header>
+  <h1>OverCoffee <span>Task Hub</span></h1>
+  <nav aria-label="Tools"><a href="/promo.html">Promo sequence</a><a href="/">Agent dashboard</a></nav>
+  <div class="me" id="me" hidden></div>
+</header>
+
+<main id="app" aria-live="polite"></main>
+
+<dialog id="dlg" aria-labelledby="dlgTitle"></dialog>
+
+<script>
+const API = "/.netlify/functions/tasks";
+const KEYS = { code: "occHub.code", me: "occHub.me", view: "occHub.view", client: "occHub.client" };
+const VIEWS = [["mine", "My work"], ["client", "By client"], ["board", "Team board"]];
+// Order for "My work": things that need action first
+const MY_ORDER = ["Changes requested", "In progress", "Needs review", "To do", "Scheduled", "Published", "Backlog"];
+const DONE_STATES = ["Published", "Closed"];
+
+const state = {
+  tasks: [], team: [], statuses: [], types: [], warnings: [], clientGroups: null,
+  loadedAt: 0, error: "",
+  view: storeGet(KEYS.view) || "mine",
+  client: storeGet(KEYS.client) || "",
+  filters: { client: "", owner: "", type: "" },
+};
+
+// ---------- small helpers ----------
+function storeGet(k) { try { return localStorage.getItem(k) || ""; } catch (_) { return ""; } }
+function storeSet(k, v) { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch (_) {} }
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const safeUrl = (u) => (/^https?:\/\//i.test(String(u || "").trim()) ? String(u).trim() : "");
+const pad = (n) => String(n).padStart(2, "0");
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+const parseDay = (s) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || ""); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; };
+const dayDiff = (a, b) => Math.round((parseDay(a) - parseDay(b)) / 86400000);
+
+function fmtDay(s) {
+  const d = parseDay(s);
+  if (!d) return s || "";
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+// Working days (Mon to Fri) from a date until today, not counting the start day
+function workingDaysSince(s) {
+  const start = parseDay(s);
+  if (!start) return 0;
+  const end = parseDay(todayISO());
+  let n = 0;
+  for (let d = new Date(start); d < end; ) {
+    d.setDate(d.getDate() + 1);
+    const w = d.getDay();
+    if (w !== 0 && w !== 6) n++;
+  }
+  return n;
+}
+
+const lowerFirst = (s) => (/^(Due|No|Needs|Result|Closed)\b/.test(s) ? s.charAt(0).toLowerCase() + s.slice(1) : s);
+const isOpen = (t) => t.status !== "Closed";
+const isLate = (t) => Boolean(t.due) && !DONE_STATES.includes(t.status) && t.due < todayISO();
+const isStuck = (t) => t.status === "Needs review" && workingDaysSince(t.statusSince) > 2;
+
+function whenText(t) {
+  if (t.status === "Closed") return t.result ? t.result.split(/[.,;\n]/)[0] : "Closed";
+  if (t.status === "Published") return t.result ? "Result in" : "Needs result";
+  if (!t.due) return "No due date";
+  const diff = dayDiff(t.due, todayISO());
+  if (diff < 0 && isLate(t)) return diff === -1 ? "1 day late" : `${-diff} days late`;
+  if (diff === 0) return "Due today";
+  if (diff === 1) return "Due tomorrow";
+  if (diff > 1 && diff < 7) return "Due " + parseDay(t.due).toLocaleDateString("en-US", { weekday: "short" });
+  return "Due " + fmtDay(t.due);
+}
+
+function flags(t) {
+  const out = [];
+  if (isStuck(t)) out.push(`<span class="chip flag">In review ${workingDaysSince(t.statusSince)} days</span>`);
+  if (t.priority === "High" && isOpen(t)) out.push(`<span class="chip flag">High</span>`);
+  return out.join("");
+}
+
+// ---------- data ----------
+async function load() {
+  const code = storeGet(KEYS.code);
+  if (!code) return renderGate();
+  state.error = "";
+  try {
+    const res = await fetch(API, { headers: { "x-team-code": code } });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) { storeSet(KEYS.code, ""); return renderGate(data.error || "That access code didn't work."); }
+    if (!res.ok) throw new Error(data.error || `The hub couldn't load tasks (${res.status}).`);
+    Object.assign(state, { tasks: data.tasks || [], team: data.team || [], statuses: data.statuses || [], types: data.types || [], warnings: data.warnings || [], loadedAt: Date.now() });
+  } catch (err) {
+    state.error = err.message || "The hub couldn't load tasks. Check your connection and refresh.";
+  }
+  if (!state.clientGroups) loadClients(); // client list comes from promo.js, shared with the promo tool
+  if (!storeGet(KEYS.me) || (state.team.length && !state.team.includes(storeGet(KEYS.me)))) return renderWho();
+  render();
+  openFromHash();
+}
+
+async function loadClients() {
+  try {
+    const res = await fetch("/.netlify/functions/promo", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ step: "clients" }) });
+    const data = await res.json();
+    if (res.ok && Array.isArray(data.groups)) { state.clientGroups = data.groups; render(); }
+  } catch (_) { /* fall back to clients found in tasks */ }
+}
+
+// Client options grouped like the promo tool, plus any client that only appears in the sheet
+function clientOptions(selected, allLabel) {
+  const inTasks = [...new Set(state.tasks.map((t) => t.client).filter(Boolean))];
+  const known = new Set();
+  let html = allLabel ? `<option value="">${esc(allLabel)}</option>` : "";
+  for (const g of state.clientGroups || []) {
+    const opts = g.clients.map((c) => { known.add(c.code.toLowerCase()); return `<option value="${esc(c.code)}"${c.code === selected ? " selected" : ""}>${esc(c.code)}</option>`; }).join("");
+    html += `<optgroup label="${esc(g.label)}">${opts}</optgroup>`;
+  }
+  const extra = inTasks.filter((c) => !known.has(c.toLowerCase())).sort();
+  if (extra.length) {
+    const opts = extra.map((c) => `<option value="${esc(c)}"${c === selected ? " selected" : ""}>${esc(c)}</option>`).join("");
+    html += state.clientGroups ? `<optgroup label="Other">${opts}</optgroup>` : opts;
+  }
+  return html;
+}
+const sameClient = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
+
+// ---------- screens ----------
+function renderGate(error) {
+  $("#me").hidden = true;
+  $("#app").innerHTML = `
+    <form class="gate" id="gate" novalidate>
+      <h2>Team sign-in</h2>
+      <p>Enter the team access code. You only need to do this once on this browser.</p>
+      <label for="code">Access code</label>
+      <input id="code" type="password" autocomplete="current-password" required>
+      <button class="primary" type="submit">Open the hub</button>
+      <p class="error" id="gateErr">${esc(error || "")}</p>
+    </form>`;
+  $("#code").focus();
+  $("#gate").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const v = $("#code").value.trim();
+    if (!v) { $("#gateErr").textContent = "Enter the access code first."; return; }
+    storeSet(KEYS.code, v);
+    e.submitter && (e.submitter.disabled = true);
+    $("#gateErr").textContent = "Checking…";
+    load();
+  });
+  $("#code").addEventListener("input", () => ($("#gateErr").textContent = ""));
+}
+
+function renderWho() {
+  $("#me").hidden = true;
+  if (state.error) { $("#app").innerHTML = `<p class="fail">${esc(state.error)}</p>`; return; }
+  const names = state.team.length ? state.team : [];
+  $("#app").innerHTML = `
+    <div class="gate">
+      <h2>Who are you?</h2>
+      <p>This sets your “My work” view and, later, who gets credit for changes.</p>
+      <div class="names">${names.map((n) => `<button type="button" data-name="${esc(n)}">${esc(n)}</button>`).join("") || "<p>No team names yet. Ask Ricardo to add TEAM_MEMBERS in Netlify.</p>"}</div>
+    </div>`;
+  $("#app").querySelectorAll("[data-name]").forEach((b) => b.addEventListener("click", () => { storeSet(KEYS.me, b.dataset.name); render(); openFromHash(); }));
+}
+
+function renderMe() {
+  const me = storeGet(KEYS.me);
+  const el = $("#me");
+  el.hidden = false;
+  el.innerHTML = `<span>Signed in as ${esc(me)}</span><button type="button" id="switch">Switch</button><button type="button" id="signout">Sign out</button>`;
+  $("#switch").onclick = () => { storeSet(KEYS.me, ""); renderWho(); };
+  $("#signout").onclick = () => { storeSet(KEYS.me, ""); storeSet(KEYS.code, ""); renderGate(); };
+}
+
+function render() {
+  if (!storeGet(KEYS.code)) return renderGate();
+  if (!storeGet(KEYS.me)) return renderWho();
+  renderMe();
+  const loaded = state.loadedAt ? new Date(state.loadedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "";
+  const tabs = VIEWS.map(([id, label]) => `<button type="button" role="tab" aria-selected="${state.view === id}" data-view="${id}">${label}</button>`).join("");
+  let body = "";
+  if (state.error) body = `<p class="fail">${esc(state.error)}</p>`;
+  else if (state.view === "client") body = viewClient();
+  else if (state.view === "board") body = viewBoard();
+  else body = viewMine();
+
+  const warn = state.warnings.length
+    ? `<details class="warnings"><summary>${state.warnings.length} ${state.warnings.length === 1 ? "thing" : "things"} in the Tasks sheet to fix</summary><ul>${state.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></details>`
+    : "";
+
+  $("#app").innerHTML = `
+    <div class="bar">
+      <div class="tabs" role="tablist" aria-label="Views">${tabs}</div>
+      <span class="meta">${loaded ? "Updated " + loaded : ""}</span>
+      <button type="button" id="refresh">Refresh</button>
+    </div>
+    ${warn}
+    ${body}`;
+
+  $("#app").querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => { state.view = b.dataset.view; storeSet(KEYS.view, state.view); render(); }));
+  $("#refresh").addEventListener("click", async (e) => { e.target.disabled = true; e.target.textContent = "Refreshing…"; await load(); });
+  $("#app").querySelectorAll("[data-task]").forEach((b) => b.addEventListener("click", () => openTask(b.dataset.task)));
+  bindFilters();
+}
+
+// ---------- views ----------
+function taskRow(t) {
+  return `<button type="button" class="task${isLate(t) ? " late" : ""}" data-task="${esc(t.taskId)}">
+    <span class="title">${esc(t.title)}</span>
+    <span>${t.client ? `<span class="chip">${esc(t.client)}</span>` : ""} <span class="chip type">${esc(t.type)}</span> ${flags(t)}</span>
+    <span class="pill" data-s="${esc(t.status)}">${esc(t.status)}</span>
+    <span class="when${isLate(t) ? " late" : ""}">${esc(whenText(t))}</span>
+  </button>`;
+}
+
+const byDue = (a, b) => (a.due || "9999").localeCompare(b.due || "9999") || a.taskId.localeCompare(b.taskId);
+
+function group(title, list, extraClass, note) {
+  if (!list.length) return "";
+  return `<section class="group ${extraClass || ""}"><h2>${esc(title)} <small>${list.length}${note ? " · " + esc(note) : ""}</small></h2><div class="list">${list.map(taskRow).join("")}</div></section>`;
+}
+
+function viewMine() {
+  const me = storeGet(KEYS.me);
+  const mine = state.tasks.filter((t) => sameClient(t.owner, me) && isOpen(t));
+  if (!mine.length) {
+    return `<div class="empty"><p>Nothing is assigned to you right now.</p><p>Check the <button type="button" data-view="board">Team board</button> for unassigned work.</p></div>`;
+  }
+  const late = mine.filter(isLate).sort(byDue);
+  const rest = mine.filter((t) => !isLate(t));
+  let html = group("Overdue", late, "late");
+  for (const s of MY_ORDER) {
+    const label = s === "Published" ? "Published, needs result" : s;
+    html += group(label, rest.filter((t) => t.status === s).sort(byDue));
+  }
+  return html;
+}
+
+function viewClient() {
+  const clients = [...new Set(state.tasks.map((t) => t.client).filter(Boolean))];
+  if (!clients.length) return `<p class="empty">No tasks in the sheet yet.</p>`;
+  if (!state.client || !clients.some((c) => sameClient(c, state.client))) {
+    const counts = clients.map((c) => [c, state.tasks.filter((t) => sameClient(t.client, c) && isOpen(t)).length]).sort((a, b) => b[1] - a[1]);
+    state.client = counts[0][0];
+  }
+  const all = state.tasks.filter((t) => sameClient(t.client, state.client));
+  const open = all.filter(isOpen);
+  const closed = all.filter((t) => t.status === "Closed").sort((a, b) => (b.statusSince || "").localeCompare(a.statusSince || "")).slice(0, 5);
+  let html = `<div class="filters"><label for="fClient">Client</label><select id="fClient" data-filter="byclient">${clientOptions(state.client)}</select></div>`;
+  if (!open.length && !closed.length) return html + `<p class="empty">No tasks for ${esc(state.client)} yet.</p>`;
+  html += group("Overdue", open.filter(isLate).sort(byDue), "late");
+  for (const s of state.statuses.filter((s) => s !== "Closed")) {
+    html += group(s, open.filter((t) => !isLate(t) && t.status === s).sort(byDue));
+  }
+  if (!open.length) html += `<p class="empty">Nothing open for ${esc(state.client)}.</p>`;
+  html += closed.length ? `<div class="closed">${group("Last closed", closed, "", "with results")}</div>` : "";
+  return html;
+}
+
+function viewBoard() {
+  const f = state.filters;
+  const owners = [...new Set(state.team.concat(state.tasks.map((t) => t.owner)).filter(Boolean))].sort();
+  const twoWeeksAgo = (() => { const d = new Date(); d.setDate(d.getDate() - 14); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; })();
+  const shown = state.tasks.filter((t) =>
+    (!f.client || sameClient(t.client, f.client)) &&
+    (!f.owner || sameClient(t.owner, f.owner)) &&
+    (!f.type || t.type === f.type) &&
+    (t.status !== "Closed" || (t.statusSince || "") >= twoWeeksAgo)
+  );
+  const filters = `<div class="filters">
+    <label class="sr" for="bClient">Client</label><select id="bClient" data-filter="client">${clientOptions(f.client, "All clients")}</select>
+    <label class="sr" for="bOwner">Owner</label><select id="bOwner" data-filter="owner"><option value="">Everyone</option>${owners.map((o) => `<option${o === f.owner ? " selected" : ""}>${esc(o)}</option>`).join("")}</select>
+    <label class="sr" for="bType">Type</label><select id="bType" data-filter="type"><option value="">All types</option>${state.types.map((t) => `<option${t === f.type ? " selected" : ""}>${esc(t)}</option>`).join("")}</select>
+    ${f.client || f.owner || f.type ? `<button type="button" id="clearFilters">Clear filters</button>` : ""}
+  </div>`;
+  const cols = state.statuses.map((s) => {
+    const list = shown.filter((t) => t.status === s).sort((a, b) => (isLate(b) - isLate(a)) || byDue(a, b));
+    const title = s === "Closed" ? "Closed, last 14 days" : s;
+    const cards = list.map((t) => `<button type="button" class="card${isLate(t) ? " late" : ""}" data-task="${esc(t.taskId)}">
+        <span class="title">${esc(t.title)}</span>
+        <span class="row">${t.client ? `<span class="chip">${esc(t.client)}</span>` : ""}<span class="chip type">${esc(t.type)}</span>${flags(t)}</span>
+        <span class="when${isLate(t) ? " late" : ""}">${esc(t.owner || "Unassigned")}, ${esc(lowerFirst(whenText(t)))}</span>
+      </button>`).join("");
+    return `<section class="col" aria-label="${esc(title)}"><h2>${esc(title)} <span>${list.length}</span></h2>${cards || `<p class="none">None</p>`}</section>`;
+  }).join("");
+  return filters + `<div class="board">${cols}</div>`;
+}
+
+function bindFilters() {
+  $("#app").querySelectorAll("[data-filter]").forEach((sel) => sel.addEventListener("change", () => {
+    if (sel.dataset.filter === "byclient") { state.client = sel.value; storeSet(KEYS.client, sel.value); }
+    else state.filters[sel.dataset.filter] = sel.value;
+    render();
+  }));
+  const clear = $("#clearFilters");
+  if (clear) clear.addEventListener("click", () => { state.filters = { client: "", owner: "", type: "" }; render(); });
+}
+
+// ---------- task detail ----------
+function linkOrText(v) {
+  const u = safeUrl(v);
+  return u ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a>` : `<p>${esc(v)}</p>`;
+}
+
+function openTask(id) {
+  const t = state.tasks.find((x) => x.taskId === id);
+  if (!t) return;
+  const parent = t.parentTask ? state.tasks.find((x) => x.taskId === t.parentTask) : null;
+  const children = state.tasks.filter((x) => x.parentTask === t.taskId);
+  const linked = [parent, ...children].filter(Boolean);
+  const fact = (k, v) => `<div><dt>${k}</dt><dd>${v || "None"}</dd></div>`;
+  const field = (k, v, asLink) => (v ? `<div class="field"><h3>${k}</h3>${asLink ? linkOrText(v) : `<p>${esc(v)}</p>`}</div>` : "");
+
+  const dlg = $("#dlg");
+  dlg.innerHTML = `
+    <div class="dlg-head">
+      <div>
+        <h2 id="dlgTitle">${esc(t.title)}</h2>
+        <p>${esc(t.taskId)}, ${esc(t.client || "no client")}, ${esc(t.type)}</p>
+      </div>
+      <button type="button" id="dlgClose" aria-label="Close">Close</button>
+    </div>
+    <div class="dlg-body">
+      <dl class="facts">
+        ${fact("Status", `<span class="pill" data-s="${esc(t.status)}">${esc(t.status)}</span>${t.statusSince ? ` since ${esc(fmtDay(t.statusSince))}` : ""}`)}
+        ${fact("Owner", esc(t.owner))}
+        ${fact("Reviewer", esc(t.reviewer))}
+        ${fact("Due", t.due ? `<span${isLate(t) ? ' style="color:var(--danger);font-weight:500"' : ""}>${esc(fmtDay(t.due))}${isLate(t) ? ", overdue" : ""}</span>` : "")}
+        ${fact("Priority", esc(t.priority))}
+        ${fact("Created", esc(fmtDay(t.created)))}
+      </dl>
+      ${field("Brief", t.brief)}
+      ${field("Content link", t.contentLink, true)}
+      ${field("Published link", t.publishedLink, true)}
+      ${field("Output", t.output, true)}
+      ${field("Result", t.result)}
+      ${linked.length ? `<div class="field"><h3>Linked tasks</h3><div class="linked">${linked.map((x) => `<button type="button" data-open="${esc(x.taskId)}"><span>${x === parent ? "From " : ""}${esc(x.taskId)} ${esc(x.title)}</span><span class="pill" data-s="${esc(x.status)}">${esc(x.status)}</span></button>`).join("")}</div></div>` : ""}
+      <p class="note">${t.updatedBy ? `Last changed by ${esc(t.updatedBy)}${t.updatedAt ? " on " + esc(/^\d{4}-\d{2}-\d{2}$/.test(t.updatedAt) ? fmtDay(t.updatedAt) : new Date(t.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })) : ""}. ` : ""}To change this task for now, edit row ${esc(t.row)} of the Tasks sheet. Editing here comes next.</p>
+    </div>`;
+  $("#dlgClose").onclick = () => dlg.close();
+  dlg.querySelectorAll("[data-open]").forEach((b) => (b.onclick = () => openTask(b.dataset.open)));
+  if (location.hash !== "#" + id) history.replaceState(null, "", "#" + id);
+  if (!dlg.open) dlg.showModal();
+}
+
+$("#dlg").addEventListener("close", () => history.replaceState(null, "", location.pathname + location.search));
+$("#dlg").addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+
+// Links like tasks.html#T-0142 open that task (handoff emails will use these)
+function openFromHash() {
+  const id = decodeURIComponent(location.hash.slice(1));
+  if (id && storeGet(KEYS.me) && state.tasks.some((t) => t.taskId === id)) openTask(id);
+}
+window.addEventListener("hashchange", openFromHash);
+
+// Refresh when someone comes back to the tab after a couple of minutes
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && storeGet(KEYS.code) && Date.now() - state.loadedAt > 120000 && !$("#dlg").open) load();
+});
+
+load();
+</script>
+</body>
+</html>
