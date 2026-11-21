@@ -122,6 +122,7 @@
   .form label { display: block; font-size: .85rem; color: var(--muted); font-weight: 500; margin-bottom: .2rem; }
   .form input, .form select, .form textarea { width: 100%; }
   .form textarea { min-height: 5.5rem; resize: vertical; padding: .5rem .65rem; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; }
+  .form label a { color: var(--accent); }
   .form .hint { font-size: .8rem; color: var(--muted); margin: .2rem 0 0; }
   .form .need label { color: var(--danger); }
   .actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin-top: 1rem; }
@@ -130,6 +131,8 @@
   .conflict { background: var(--warn-soft); color: var(--warn); border-radius: 8px; padding: .6rem .8rem; margin-bottom: 1rem; font-size: .9rem; }
   .toast { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%); background: var(--navy); color: #fff; padding: .65rem 1rem; border-radius: 8px; font-size: .95rem; max-width: calc(100% - 2rem); z-index: 10; }
   @media (prefers-color-scheme: dark) { .toast { background: var(--gold); color: #191a2e; } }
+  .toolbtn { display: inline-block; font-weight: 500; border-radius: 8px; padding: .5rem .85rem; border: 1px solid var(--accent); color: var(--accent); text-decoration: none; }
+  .toolbtn:hover { background: var(--accent-soft); }
   .chip.wait { background: var(--info-soft); color: var(--info); border-color: transparent; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 </style>
@@ -160,7 +163,7 @@ const DEFAULTS = {
 const DONE_STATES = ["Published", "Closed"];
 
 const state = {
-  tasks: [], team: [], statuses: [], types: [], priorities: [], results: [], hasWaitingOn: false, warnings: [], clientGroups: null,
+  tasks: [], team: [], statuses: [], types: [], priorities: [], results: [], hasWaitingOn: false, hasRequestedBy: false, promotable: [], warnings: [], clientGroups: null,
   loadedAt: 0, error: "",
   view: storeGet(KEYS.view) || "mine",
   client: storeGet(KEYS.client) || "",
@@ -234,7 +237,7 @@ async function load() {
     const data = await res.json().catch(() => ({}));
     if (res.status === 401) { storeSet(KEYS.code, ""); return renderGate(data.error || "That access code didn't work."); }
     if (!res.ok) throw new Error(data.error || `The hub couldn't load tasks (${res.status}).`);
-    Object.assign(state, { tasks: data.tasks || [], team: data.team || [], statuses: data.statuses || [], types: data.types || [], priorities: data.priorities || [], results: data.results || [], hasWaitingOn: Boolean(data.hasWaitingOn), warnings: data.warnings || [], loadedAt: Date.now() });
+    Object.assign(state, { tasks: data.tasks || [], team: data.team || [], statuses: data.statuses || [], types: data.types || [], priorities: data.priorities || [], results: data.results || [], hasWaitingOn: Boolean(data.hasWaitingOn), hasRequestedBy: Boolean(data.hasRequestedBy), promotable: data.promotable || [], warnings: data.warnings || [], loadedAt: Date.now() });
   } catch (err) {
     state.error = err.message || "The hub couldn't load tasks. Check your connection and refresh.";
   }
@@ -246,7 +249,7 @@ async function load() {
 
 async function loadClients() {
   try {
-    const res = await fetch("/.netlify/functions/promo", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ step: "clients" }) });
+    const res = await fetch("/.netlify/functions/promo", { method: "POST", headers: { "content-type": "application/json", "x-team-code": storeGet(KEYS.code) }, body: JSON.stringify({ step: "clients" }) });
     const data = await res.json();
     if (res.ok && Array.isArray(data.groups)) { state.clientGroups = data.groups; render(); }
   } catch (_) { /* fall back to clients found in tasks */ }
@@ -489,6 +492,7 @@ function openTask(id, notice) {
     </div>
     <div class="dlg-body">
       ${notice ? `<p class="conflict">${esc(notice)}</p>` : ""}
+      ${isNew ? "" : toolsFor(t)}
       <div class="form">
         <div class="wide"><label for="f_title">Title</label><input id="f_title" value="${esc(t.title)}" maxlength="200" placeholder="Holiday menu blog"></div>
         <div><label for="f_client">Client</label><select id="f_client">${clientSelect(t.client)}</select></div>
@@ -498,6 +502,7 @@ function openTask(id, notice) {
         <div><label for="f_owner">Owner</label><select id="f_owner">${teamOpts(t.owner, "Unassigned")}</select></div>
         <div><label for="f_reviewer">Reviewer</label><select id="f_reviewer">${teamOpts(t.reviewer, "None")}</select></div>
         <div><label for="f_due">Due</label><input id="f_due" type="date" value="${esc(/^\d{4}-\d{2}-\d{2}$/.test(t.due) ? t.due : "")}"></div>
+        ${state.hasRequestedBy ? `<div><label for="f_requestedBy">Requested by</label><select id="f_requestedBy">${teamOpts(isNew ? me : t.requestedBy, "Nobody")}</select></div>` : ""}
         ${state.hasWaitingOn ? `<div><label for="f_waitingOn">Waiting on</label><input id="f_waitingOn" value="${esc(t.waitingOn)}" placeholder="Client approval, account access" maxlength="80"></div>` : ""}
         <div class="wide"><label for="f_brief">Brief</label><textarea id="f_brief" placeholder="What's needed, links, notes">${esc(t.brief)}</textarea></div>
         <div class="wide"><label for="f_contentLink">Content link${link(t.contentLink)}</label><input id="f_contentLink" type="url" value="${esc(t.contentLink)}" placeholder="https://"></div>
@@ -535,10 +540,31 @@ function openTask(id, notice) {
   if (isNew) $("#f_title").focus();
 }
 
+// Tools a task can run. Promote opens the promo tool prefilled; the result comes back to the hub.
+function promoteUrl(t) {
+  const q = new URLSearchParams({ client: t.client, task: t.taskId, title: t.title });
+  const link = safeUrl(t.publishedLink) || safeUrl(t.contentLink);
+  if (link) q.set("url", link);
+  else q.set("topic", [t.title, t.brief].filter(Boolean).join(". ").slice(0, 600));
+  return "/promo.html?" + q.toString();
+}
+function toolsFor(t) {
+  if (!(state.promotable || []).includes(t.type)) return "";
+  const contentNeedsLink = t.type === "CONTENT" && !safeUrl(t.publishedLink);
+  const hint = contentNeedsLink
+    ? "Add the published link and save to promote this post."
+    : t.type === "CONTENT"
+      ? "Builds social posts, an email and a segment from the published post, emails Rodri, and adds a linked PROMO task here."
+      : `Builds the promo package${safeUrl(t.publishedLink) || safeUrl(t.contentLink) ? " from the link" : " from this task's title and brief"}, emails Rodri, and moves this task to Needs review.`;
+  return `<div class="field" style="margin-bottom:1.1rem;padding-bottom:1rem;border-bottom:1px solid var(--line)"><h3>Tools</h3>
+    ${contentNeedsLink ? `<button type="button" disabled>Promote</button>` : `<a class="toolbtn" href="${esc(promoteUrl(t))}" target="_blank" rel="noopener">Promote</a>`}
+    <p class="hint" style="font-size:.85rem;color:var(--muted);margin:.35rem 0 0">${esc(hint)}</p></div>`;
+}
+
 function readForm() {
   const v = (id) => { const el = $("#f_" + id); return el ? el.value.trim() : undefined; };
   const out = {};
-  for (const k of ["title", "client", "type", "status", "priority", "owner", "reviewer", "due", "brief", "contentLink", "publishedLink", "output", "result", "waitingOn"]) {
+  for (const k of ["title", "client", "type", "status", "priority", "owner", "reviewer", "due", "brief", "contentLink", "publishedLink", "output", "result", "waitingOn", "requestedBy"]) {
     const val = v(k);
     if (val !== undefined) out[k] = val;
   }
@@ -626,7 +652,7 @@ window.addEventListener("hashchange", openFromHash);
 
 // Refresh when someone comes back to the tab after a couple of minutes
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && storeGet(KEYS.code) && Date.now() - state.loadedAt > 120000 && !$("#dlg").open) load();
+  if (document.visibilityState === "visible" && storeGet(KEYS.code) && Date.now() - state.loadedAt > 30000 && !$("#dlg").open) load();
 });
 
 load();
