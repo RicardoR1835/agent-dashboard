@@ -218,6 +218,12 @@ function clientBlock({ base, p, all }, kind, context) {
 const color = (v, fallback) => (/^#[0-9a-f]{3,8}$/i.test(String(v || "").trim()) ? String(v).trim() : fallback);
 const fontStack = (v) => String(v || "").replace(/["<>;{}]/g, "").trim() || DEFAULT_FONT;
 
+// Extra rules when the run starts from a topic instead of a real page.
+function sourceRules(content) {
+  if (!content || !content.fromTopic) return "";
+  return `SOURCE: This run starts from a topic idea, not a published page. The only facts you may use are in CLIENT DOCS above (services, locations, taglines, booking details, audience). Do not state prices, dates, menu items, offers, awards, statistics or results unless they appear there. Where a specific detail would help, write a placeholder like [ADD: holiday booking deadline] instead of inventing one. The goal is to drive people to the link given.\n`;
+}
+
 function languageLine(language) {
   return language === "Spanish"
     ? "Write everything in Spanish (neutral Latin American Spanish unless the content says otherwise)."
@@ -528,11 +534,18 @@ async function context({ client }) {
   }
   const site = sitePromise ? await sitePromise : null;
 
+  // A booking link from the docs, used as the button link for topic runs
+  const allDocs = docs.map((d) => d.text).join("\n");
+  const booking =
+    (allDocs.match(/booking[^:\n]*:\**\s*\[?((?:https?:\/\/)?[a-z0-9.-]+\.[a-z]{2,}\/[^\s\])]*)/i) || [])[1] ||
+    (allDocs.match(/((?:https?:\/\/)?[a-z0-9-]+\.tripleseat\.com\/[^\s\])]*)/i) || [])[1] || "";
+
   return {
     context: docs.map((d) => `=== ${d.label} ===\n${d.text}`).join("\n\n"),
     sources: docs.map((d) => d.label),
     note: notes.join(" "),
     website,
+    bookingUrl: urlish(booking),
     site,
   };
 }
@@ -556,7 +569,11 @@ async function clients() {
 }
 
 // 1. Read the content: a URL (blog post, landing page) or pasted text.
-async function extract({ url, text }) {
+async function extract({ url, text, topic }) {
+  if (topic && topic.trim()) {
+    const t = topic.trim();
+    return { title: t.split("\n")[0].slice(0, 120), description: "", text: `TOPIC (there is no source page): ${t.slice(0, 2000)}`, url: "", fromTopic: true };
+  }
   if (text && text.trim()) {
     const t = text.trim();
     return { title: t.split("\n")[0].slice(0, 120), description: "", text: t.slice(0, 12000), url: url || "" };
@@ -594,7 +611,7 @@ async function social({ client, content, platform, goal, language, context }) {
   const system =
     "You are OverCoffee Consulting's social media writer. You turn one piece of client content into platform-native posts that drive people to it. You never invent facts, prices, dates, offers or statistics that aren't in the content.";
   const user = `${clientBlock(prof, "social", context)}
-${languageLine(language)}
+${sourceRules(content)}${languageLine(language)}
 Goal of the promotion: ${goal || "get people to read the content and take its next step"}
 Content URL: ${content.url || "(none, pasted content)"}
 
@@ -624,7 +641,7 @@ async function email({ client, content, posts, goal, language, context, site }) 
     .map((p) => `${p.platform}: ${String(p.variations?.[0]?.copy || "").slice(0, 300)}`)
     .join("\n");
   const user = `${clientBlock(prof, "email", context)}
-${languageLine(language)}
+${sourceRules(content)}${languageLine(language)}
 Goal: ${goal || "get subscribers to read the content"}
 Link the button to: ${content.url || "[ADD LINK]"}
 
@@ -684,7 +701,7 @@ async function segment({ client, content, email: mail, goal, knownSegments, cont
   const system =
     "You are OverCoffee Consulting's CRM strategist. You recommend which audience segment should receive a promo email. You never invent list sizes, open rates or other numbers.";
   const user = `${clientBlock(prof, null, context)}
-Goal: ${goal || "get subscribers to read the content"}
+${sourceRules(content)}Goal: ${goal || "get subscribers to read the content"}
 Content title: ${content.title}
 Content summary: ${(content.description || content.text).slice(0, 1500)}
 Email subject options: ${(mail?.subject_lines || []).join(" | ")}
@@ -773,7 +790,7 @@ async function logToSheet(row) {
 async function notify({ client, title, url, sections, cc, emailHtml, meta = {} }) {
   const out = { emailed: false, logged: false, slack: false, warnings: [] };
   const clientName = CLIENTS[client]?.name || client;
-  const subject = `Promo package ready: ${clientName} – ${title || "new content"}`.slice(0, 180);
+  const subject = `Promo package ready${meta.fromTopic ? " (from a topic)" : ""}: ${clientName} – ${title || "new content"}`.slice(0, 180);
   const ccList = String(cc || "")
     .split(/[,;\s]+/)
     .map((s) => s.trim())
@@ -812,7 +829,7 @@ async function notify({ client, title, url, sections, cc, emailHtml, meta = {} }
       await logToSheet([
         new Date().toISOString().slice(0, 10),
         clientName,
-        title || "",
+        meta.fromTopic ? `Topic: ${title || ""}` : title || "",
         url || "",
         meta.platforms || "",
         meta.subject || "",
