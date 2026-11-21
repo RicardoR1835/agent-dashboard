@@ -550,6 +550,7 @@ function promoteUrl(t) {
 }
 function toolsFor(t) {
   if (!(state.promotable || []).includes(t.type)) return "";
+  const pkg = /\/package\.html#/.test(t.output || "") ? `<a class="toolbtn" href="/package.html#${encodeURIComponent(t.taskId)}" target="_blank" rel="noopener">View package</a> ` : "";
   const contentNeedsLink = t.type === "CONTENT" && !safeUrl(t.publishedLink);
   const hint = contentNeedsLink
     ? "Add the published link and save to promote this post."
@@ -557,7 +558,7 @@ function toolsFor(t) {
       ? "Builds social posts, an email and a segment from the published post, emails Rodri, and adds a linked PROMO task here."
       : `Builds the promo package${safeUrl(t.publishedLink) || safeUrl(t.contentLink) ? " from the link" : " from this task's title and brief"}, emails Rodri, and moves this task to Needs review.`;
   return `<div class="field" style="margin-bottom:1.1rem;padding-bottom:1rem;border-bottom:1px solid var(--line)"><h3>Tools</h3>
-    ${contentNeedsLink ? `<button type="button" disabled>Promote</button>` : `<a class="toolbtn" href="${esc(promoteUrl(t))}" target="_blank" rel="noopener">Promote</a>`}
+    ${pkg}${contentNeedsLink ? `<button type="button" disabled>Promote</button>` : `<a class="toolbtn" href="${esc(promoteUrl(t))}" target="_blank" rel="noopener">${pkg ? "Promote again" : "Promote"}</a>`}
     <p class="hint" style="font-size:.85rem;color:var(--muted);margin:.35rem 0 0">${esc(hint)}</p></div>`;
 }
 
