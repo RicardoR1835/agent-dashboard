@@ -84,15 +84,26 @@
   .send { border-top: 1px solid var(--line); padding-top: 1.25rem; }
   .warn { background: var(--danger-soft); color: var(--danger); border-radius: 8px; padding: .6rem .8rem; font-size: .9rem; margin-top: .75rem; }
   .ok { color: var(--ok); }
+  .tasknote { border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; padding: .7rem .9rem; margin-bottom: 1rem; font-size: .95rem; }
+  .tasknote a, .ok a { color: var(--accent); }
+  .codebox { border: 1px solid var(--line); border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+  .codebox .row input { flex: 1; min-width: 10rem; }
 </style>
 </head>
 <body>
 <header>
   <h1>OverCoffee <span>Promo sequence</span></h1>
-  <a href="/">Back to dashboard</a>
+  <nav style="display:flex;gap:1rem"><a href="/tasks.html">Task Hub</a><a href="/">Back to dashboard</a></nav>
 </header>
 
 <div class="wrap">
+  <div class="codebox" id="codeBox" hidden>
+    <label for="teamCode">Team access code</label>
+    <p class="hint">Same code as the Task Hub. You only enter it once on this browser.</p>
+    <div class="row"><input id="teamCode" type="password" autocomplete="current-password"><button type="button" id="codeBtn">Continue</button></div>
+    <p class="error" id="codeErr" role="alert"></p>
+  </div>
+  <div class="tasknote" id="taskNote" hidden></div>
   <form id="f" novalidate>
     <label for="client">Client</label>
     <select id="client"></select>
@@ -223,16 +234,30 @@ const PROJECTS = {};
 const FALLBACK_GROUPS = [{ label: "Clients", clients: [{ code: "OCC", name: "OverCoffee Consulting" }] }];
 let state = {};
 
+// Shared with the Task Hub (same site, same browser)
+const HUB = { code: "occHub.code", me: "occHub.me" };
+const hubGet = (k) => { try { return localStorage.getItem(k) || ""; } catch (_) { return ""; } };
+const hubSet = (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch (_) {} };
+const params = new URLSearchParams(location.search);
+let linkedTaskId = (params.get("task") || "").trim();
+
 async function call(step, payload) {
   const res = await fetch("/.netlify/functions/promo", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", "x-team-code": hubGet(HUB.code) },
     body: JSON.stringify({ step, ...payload }),
   });
   let data;
   try { data = await res.json(); } catch { throw new Error(`The server didn't respond properly (${res.status}). Netlify may have timed out; run it again.`); }
+  if (res.status === 401) { hubSet(HUB.code, ""); askForCode(data.error); throw new Error("Enter the team access code first."); }
   if (!res.ok || data.error) throw new Error(data.error || `Server error ${res.status}`);
   return data;
+}
+
+function askForCode(message) {
+  $("codeBox").hidden = false;
+  $("codeErr").textContent = message || "";
+  $("teamCode").focus();
 }
 
 function mark(step, status, note) {
@@ -429,6 +454,7 @@ async function sendToRodri() {
   mark("notify", "running", "Sending");
   try {
     const r = await call("notify", {
+      taskId: linkedTaskId, by: hubGet(HUB.me),
       client: state.client, title: state.content.title, url: state.content.url,
       sections: packageSections(), cc: $("cc").value, emailHtml: buildEmailHtml(),
       meta: {
@@ -444,6 +470,13 @@ async function sendToRodri() {
     if (r.slack) bits.push("Slack posted");
     mark("notify", r.emailed ? "done" : "failed", bits.join(", ") || "Not sent");
     if (bits.length) { const s = document.createElement("span"); s.className = "ok"; s.textContent = bits.join(", ") + "."; $("sendStatus").append(s); }
+    if (r.task) {
+      // Sending again updates this same task instead of creating another one
+      linkedTaskId = r.task.taskId;
+      const s = document.createElement("span"); s.className = "ok";
+      s.innerHTML = ` ${r.task.created ? "Created" : "Updated"} task <a href="${esc(r.task.url)}" target="_blank" rel="noopener">${esc(r.task.taskId)}</a> in the Task Hub.`;
+      $("sendStatus").append(s);
+    }
     (r.warnings || []).forEach((w) => { const d = document.createElement("div"); d.className = "warn"; d.textContent = w; $("sendWarn").append(d); });
     btn.textContent = "Send again";
   } catch (err) {
@@ -533,7 +566,8 @@ async function run(e) {
 
 async function loadClients() {
   let groups = FALLBACK_GROUPS;
-  try { const r = await call("clients", {}); if (r.groups && r.groups.length) groups = r.groups; } catch {}
+  if (!hubGet(HUB.code)) askForCode();
+  else { try { const r = await call("clients", {}); if (r.groups && r.groups.length) groups = r.groups; $("codeBox").hidden = true; } catch {} }
   const sel = $("client"); sel.innerHTML = "";
   groups.forEach((g) => {
     const og = document.createElement("optgroup"); og.label = g.label;
@@ -545,11 +579,42 @@ async function loadClients() {
   });
 }
 
+// Opened from a task: tasks.html sends ?client=&url= (or &topic=) &task=&title=
+function prefillFromTask() {
+  const client = params.get("client"), url = params.get("url"), topic = params.get("topic");
+  if (client) {
+    const opt = [...$("client").options].find((o) => o.value.toLowerCase() === client.toLowerCase());
+    if (opt) $("client").value = opt.value;
+  }
+  if (topic && !url) {
+    document.querySelector('input[name="mode"][value="topic"]').checked = true;
+    $("contentFields").hidden = true; $("topicFields").hidden = false;
+    $("topic").value = topic;
+  } else if (url) {
+    $("url").value = url;
+  }
+  if (linkedTaskId) {
+    const title = params.get("title") || "";
+    $("taskNote").hidden = false;
+    $("taskNote").innerHTML = `Promoting for task <a href="/tasks.html#${encodeURIComponent(linkedTaskId)}">${esc(linkedTaskId)}</a>${title ? ` (${esc(title)})` : ""}. When you email Rodri, the package is written back to the Task Hub.`;
+  }
+}
+
+$("codeBtn").addEventListener("click", async () => {
+  const v = $("teamCode").value.trim();
+  if (!v) { $("codeErr").textContent = "Enter the code."; return; }
+  hubSet(HUB.code, v);
+  $("codeErr").textContent = "Checking…";
+  try { await call("clients", {}); $("codeBox").hidden = true; $("codeErr").textContent = ""; await loadClients(); prefillFromTask(); }
+  catch (err) { $("codeErr").textContent = "That code didn't work."; }
+});
+$("teamCode").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("codeBtn").click(); } });
+
 $("f").addEventListener("submit", run);
 $("sendBtn").addEventListener("click", sendToRodri);
 $("refineBtn").addEventListener("click", refineInClaude);
 ["url", "text"].forEach((id) => $(id).addEventListener("input", () => ($("formError").textContent = "")));
-loadClients();
+loadClients().then(prefillFromTask);
 </script>
 </body>
 </html>
