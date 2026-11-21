@@ -1,6 +1,7 @@
 // netlify/functions/tasks.js
 // OverCoffee Task Hub: tasks API. The sheet logic lives in netlify/lib/tasks-store.js.
 //   GET                                   every task in the Tasks tab, plus the team list
+//   GET ?package=T-0041                   the saved promo package for that task (package.html)
 //   POST { action: "create", task, by }   adds a task with the next Task ID
 //   POST { action: "update", taskId, changes, expectedUpdatedAt, by }
 //                                         changes one task. If someone else saved it after
@@ -16,6 +17,7 @@
 const { checkAccess, teamMembers } = require("../lib/auth");
 const { googleReady } = require("../lib/google");
 const store = require("../lib/tasks-store");
+const { getPackage } = require("../lib/packages");
 
 const json = (statusCode, body) => ({
   statusCode,
@@ -41,6 +43,13 @@ exports.handler = async (event) => {
       if (body.action === "create") return reply(await store.createTask(body.task, body.by));
       if (body.action === "update") return reply(await store.updateTask(body.taskId, body.changes, body.by, { expectedUpdatedAt: body.expectedUpdatedAt }));
       return json(400, { error: `Unknown action: ${body.action}` });
+    }
+
+    // GET ?package=T-0041 returns the saved promo package for that task
+    const pkgId = (event.queryStringParameters || {}).package;
+    if (pkgId) {
+      const pkg = await getPackage(String(pkgId).trim());
+      return pkg ? json(200, { package: pkg }) : json(404, { error: `No saved package for ${pkgId}. It's saved when someone emails Rodri from the promo tool.` });
     }
 
     const { keys, tasks, warnings } = await store.loadAll();
