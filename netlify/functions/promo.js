@@ -16,8 +16,15 @@
 //   PROMO_SHEET_TAB       optional, defaults to "Promo Log"
 //   PROFILES_TAB          optional, defaults to "Client Profiles" (same sheet: styling, voice, examples per client)
 //   SLACK_WEBHOOK_URL     optional
+//   TEAM_ACCESS_CODE      the Task Hub access code; every step checks it (see netlify/lib/auth.js)
+//
+// Task Hub link: notify accepts taskId and by. A SOCIAL, EMAIL or PROMO task gets the package
+// attached and goes to Needs review; a CONTENT task (or no task) gets a new PROMO task for Rodri.
 
 const crypto = require("crypto");
+const { checkAccess, teamMembers } = require("../lib/auth");
+const { privateKey } = require("../lib/google");
+const tasks = require("../lib/tasks-store");
 const MODEL = "claude-haiku-4-5-20251001"; // same model as agent.js
 
 // ---------- client roster ----------
@@ -719,7 +726,7 @@ JSON shape:
 }
 
 // 5. Email the package to Rodri (HTML email attached) and log a row in the Promo Log sheet.
-function packageHtml({ clientName, url, sections }) {
+function packageHtml({ clientName, url, sections, taskUrl }) {
   const blocks = (sections || [])
     .map((s) => {
       const items = (s.items || [])
@@ -735,14 +742,15 @@ function packageHtml({ clientName, url, sections }) {
 <p style="font:16px/1.55 Arial,sans-serif;color:#222">Hi Rodri, a promo package for <strong>${esc(clientName)}</strong> is ready for your review. Nothing has been posted or sent yet. The ready-to-paste HTML email is attached.</p>
 ${url ? `<p style="font:16px/1.55 Arial,sans-serif;color:#222">Content: <a href="${esc(url)}">${esc(url)}</a></p>` : ""}
 ${blocks}
-<p style="font:16px/1.5 Arial,sans-serif;color:#555;margin-top:32px">Update the status in the Promo Log sheet once it's scheduled. Reply to this email with changes.</p>
+<p style="font:16px/1.5 Arial,sans-serif;color:#555;margin-top:32px">${taskUrl ? `Track it in the Task Hub: <a href="${esc(taskUrl)}">${esc(taskUrl)}</a>. Mark it Scheduled, then Published, then add the Result there.` : "Update the status in the Promo Log sheet once it's scheduled."} Reply to this email with changes.</p>
 </div>`;
 }
 
-function packageText({ clientName, url, sections }) {
+function packageText({ clientName, url, sections, taskUrl }) {
   return [
     `Hi Rodri, a promo package for ${clientName} is ready for your review. Nothing has been posted or sent yet. The ready-to-paste HTML email is attached.`,
     url ? `Content: ${url}` : "",
+    taskUrl ? `Task Hub: ${taskUrl}` : "",
     ...(sections || []).map((s) => `== ${s.heading} ==\n\n${(s.items || []).join("\n\n---\n\n")}`),
   ]
     .filter(Boolean)
@@ -759,8 +767,7 @@ async function googleToken() {
     iat: now,
     exp: now + 3600,
   })}`;
-  const key = process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n");
-  const sig = crypto.createSign("RSA-SHA256").update(unsigned).sign(key, "base64url");
+  const sig = crypto.createSign("RSA-SHA256").update(unsigned).sign(privateKey(), "base64url");
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -774,7 +781,7 @@ async function googleToken() {
 async function logToSheet(row) {
   const tab = process.env.PROMO_SHEET_TAB || "Promo Log";
   const token = await googleToken();
-  const range = encodeURIComponent(`${tab}!A:L`);
+  const range = encodeURIComponent(`${tab}!A:M`);
   const res = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${process.env.PROMO_SHEET_ID}/values/${range}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
     {
@@ -787,9 +794,63 @@ async function logToSheet(row) {
   if (!res.ok) throw new Error(`Sheet: ${data.error?.message || res.status}`);
 }
 
-async function notify({ client, title, url, sections, cc, emailHtml, meta = {} }) {
-  const out = { emailed: false, logged: false, slack: false, warnings: [] };
+// Writes the package back to the Task Hub before the email goes out, so the email can link to the task.
+//   SOCIAL / EMAIL / PROMO task: attach the package to it and send it to Rodri for review.
+//   CONTENT task, or no task: create a PROMO task for Rodri (linked to the CONTENT task).
+async function linkTask({ client, title, url, taskId, by, fromTopic }) {
+  const env = process.env;
+  const rodri = teamMembers().find((m) => env.RODRI_EMAIL && tasks.same(m.email, env.RODRI_EMAIL))?.name || "Rodri";
+  const output = `https://docs.google.com/spreadsheets/d/${env.PROMO_SHEET_ID}/edit`;
+  const today = new Date().toISOString().slice(0, 10);
+  const note = `Promo package sent to ${rodri} on ${today} (row in Promo Log).`;
+  const { tasks: all } = await tasks.loadAll();
+  const source = taskId ? all.find((t) => t.taskId === taskId) : null;
+
+  if (source && source.type !== "CONTENT") {
+    const reviewer = source.reviewer || rodri;
+    const r = await tasks.updateTask(source.taskId, {
+      status: "Needs review",
+      reviewer,
+      output,
+      contentLink: source.contentLink || (fromTopic ? "" : url || ""),
+      brief: source.brief ? `${source.brief}\n\n${note}` : note,
+    }, by, { force: true, notify: !tasks.same(reviewer, rodri) }); // Rodri already gets the package email
+    if (r.code !== 200) throw new Error(r.error);
+    return { task: r.task, created: false };
+  }
+
+  const r = await tasks.createTask({
+    client,
+    title: `Promo: ${title || source?.title || "new content"}`.slice(0, 200),
+    type: "PROMO",
+    status: "Needs review",
+    owner: rodri,
+    reviewer: rodri,
+    priority: source?.priority || "Normal",
+    brief: `${fromTopic ? `Topic: ${title}` : `Promoting ${url || title}`}\n\n${note}`,
+    contentLink: fromTopic ? "" : url || "",
+    output,
+    parentTask: source ? source.taskId : "",
+  }, by, { notify: false });
+  if (r.code !== 200) throw new Error(r.error);
+  return { task: r.task, created: true };
+}
+
+async function notify({ client, title, url, sections, cc, emailHtml, meta = {}, taskId = "", by = "" }) {
+  const out = { emailed: false, logged: false, slack: false, warnings: [], task: null };
   const clientName = CLIENTS[client]?.name || client;
+  const env0 = process.env;
+
+  // 1. Task Hub first, so the email to Rodri can link straight to the task
+  if (env0.GOOGLE_CLIENT_EMAIL && env0.GOOGLE_PRIVATE_KEY && env0.PROMO_SHEET_ID) {
+    try {
+      const linked = await linkTask({ client, title, url, taskId: String(taskId || "").trim(), by: String(by || "").trim() || "Promo tool", fromTopic: !!meta.fromTopic });
+      out.task = { taskId: linked.task.taskId, title: linked.task.title, created: linked.created, url: tasks.taskLink(linked.task.taskId) };
+    } catch (err) {
+      out.warnings.push(`The Task Hub wasn't updated: ${err.message}`);
+    }
+  }
+  const taskUrl = out.task ? out.task.url : "";
   const subject = `Promo package ready${meta.fromTopic ? " (from a topic)" : ""}: ${clientName} – ${title || "new content"}`.slice(0, 180);
   const ccList = String(cc || "")
     .split(/[,;\s]+/)
@@ -812,8 +873,8 @@ async function notify({ client, title, url, sections, cc, emailHtml, meta = {} }
         cc: ccList.length ? ccList : undefined,
         reply_to: ccList[0] || undefined,
         subject,
-        html: packageHtml({ clientName, url, sections }),
-        text: packageText({ clientName, url, sections }),
+        html: packageHtml({ clientName, url, sections, taskUrl }),
+        text: packageText({ clientName, url, sections, taskUrl }),
         attachments: emailHtml
           ? [{ filename: `${slug || "promo"}-email.html`, content: Buffer.from(emailHtml, "utf8").toString("base64") }]
           : undefined,
@@ -839,6 +900,7 @@ async function notify({ client, title, url, sections, cc, emailHtml, meta = {} }
         "", // Notes
         "", // Result (Rodri fills in: Used as-is / Light edit / Rewrote / Didn't use)
         "", // What we changed
+        out.task ? out.task.taskId : "", // Task ID (links this row to the Task Hub)
       ]);
       out.logged = true;
     } catch (err) {
@@ -866,6 +928,8 @@ const STEPS = { clients, extract, context, social, email, segment, notify };
 
 exports.handler = async (event) => {
   if (event.httpMethod !== "POST") return json(405, { error: "Use POST." });
+  const denied = await checkAccess(event);
+  if (denied) return json(denied.statusCode, { error: denied.error, needsCode: denied.statusCode === 401 });
   let body;
   try {
     body = JSON.parse(event.body || "{}");
