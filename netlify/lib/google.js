@@ -110,4 +110,4 @@ async function appendRow(tab, values) {
   );
 }
 
-module.exports = { googleReady, googleToken, readTab, writeRow, appendRow };
+module.exports = { googleReady, googleToken, privateKey, readTab, writeRow, appendRow };
