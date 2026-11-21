@@ -25,6 +25,7 @@ const crypto = require("crypto");
 const { checkAccess, teamMembers } = require("../lib/auth");
 const { privateKey } = require("../lib/google");
 const tasks = require("../lib/tasks-store");
+const { savePackage, packageLink } = require("../lib/packages");
 const MODEL = "claude-haiku-4-5-20251001"; // same model as agent.js
 
 // ---------- client roster ----------
@@ -726,7 +727,7 @@ JSON shape:
 }
 
 // 5. Email the package to Rodri (HTML email attached) and log a row in the Promo Log sheet.
-function packageHtml({ clientName, url, sections, taskUrl }) {
+function packageHtml({ clientName, url, sections, taskUrl, packageUrl }) {
   const blocks = (sections || [])
     .map((s) => {
       const items = (s.items || [])
@@ -741,16 +742,18 @@ function packageHtml({ clientName, url, sections, taskUrl }) {
   return `<div style="max-width:640px;margin:0 auto;padding:16px">
 <p style="font:16px/1.55 Arial,sans-serif;color:#222">Hi Rodri, a promo package for <strong>${esc(clientName)}</strong> is ready for your review. Nothing has been posted or sent yet. The ready-to-paste HTML email is attached.</p>
 ${url ? `<p style="font:16px/1.55 Arial,sans-serif;color:#222">Content: <a href="${esc(url)}">${esc(url)}</a></p>` : ""}
+${packageUrl ? `<p style="font:16px/1.55 Arial,sans-serif;color:#222"><a href="${esc(packageUrl)}" style="display:inline-block;background:#191a2e;color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:bold">Open the package</a> (copy buttons and email preview)</p>` : ""}
 ${blocks}
 <p style="font:16px/1.5 Arial,sans-serif;color:#555;margin-top:32px">${taskUrl ? `Track it in the Task Hub: <a href="${esc(taskUrl)}">${esc(taskUrl)}</a>. Mark it Scheduled, then Published, then add the Result there.` : "Update the status in the Promo Log sheet once it's scheduled."} Reply to this email with changes.</p>
 </div>`;
 }
 
-function packageText({ clientName, url, sections, taskUrl }) {
+function packageText({ clientName, url, sections, taskUrl, packageUrl }) {
   return [
     `Hi Rodri, a promo package for ${clientName} is ready for your review. Nothing has been posted or sent yet. The ready-to-paste HTML email is attached.`,
     url ? `Content: ${url}` : "",
     taskUrl ? `Task Hub: ${taskUrl}` : "",
+    packageUrl ? `Open the package: ${packageUrl}` : "",
     ...(sections || []).map((s) => `== ${s.heading} ==\n\n${(s.items || []).join("\n\n---\n\n")}`),
   ]
     .filter(Boolean)
@@ -800,9 +803,9 @@ async function logToSheet(row) {
 async function linkTask({ client, title, url, taskId, by, fromTopic }) {
   const env = process.env;
   const rodri = teamMembers().find((m) => env.RODRI_EMAIL && tasks.same(m.email, env.RODRI_EMAIL))?.name || "Rodri";
-  const output = `https://docs.google.com/spreadsheets/d/${env.PROMO_SHEET_ID}/edit`;
+  const sheetLink = `https://docs.google.com/spreadsheets/d/${env.PROMO_SHEET_ID}/edit`;
   const today = new Date().toISOString().slice(0, 10);
-  const note = `Promo package sent to ${rodri} on ${today} (row in Promo Log).`;
+  const note = `Promo package sent to ${rodri} on ${today} Open it with View package on the task.`;
   const { tasks: all } = await tasks.loadAll();
   const source = taskId ? all.find((t) => t.taskId === taskId) : null;
 
@@ -811,7 +814,7 @@ async function linkTask({ client, title, url, taskId, by, fromTopic }) {
     const r = await tasks.updateTask(source.taskId, {
       status: "Needs review",
       reviewer,
-      output,
+      output: packageLink(source.taskId),
       contentLink: source.contentLink || (fromTopic ? "" : url || ""),
       brief: source.brief ? `${source.brief}\n\n${note}` : note,
     }, by, { force: true, notify: !tasks.same(reviewer, rodri) }); // Rodri already gets the package email
@@ -829,11 +832,12 @@ async function linkTask({ client, title, url, taskId, by, fromTopic }) {
     priority: source?.priority || "Normal",
     brief: `${fromTopic ? `Topic: ${title}` : `Promoting ${url || title}`}\n\n${note}`,
     contentLink: fromTopic ? "" : url || "",
-    output,
+    output: sheetLink, // replaced with the package link right after
     parentTask: source ? source.taskId : "",
   }, by, { notify: false });
   if (r.code !== 200) throw new Error(r.error);
-  return { task: r.task, created: true };
+  const r2 = await tasks.updateTask(r.task.taskId, { output: packageLink(r.task.taskId) }, by, { force: true, notify: false });
+  return { task: r2.code === 200 ? r2.task : r.task, created: true };
 }
 
 async function notify({ client, title, url, sections, cc, emailHtml, meta = {}, taskId = "", by = "" }) {
@@ -851,13 +855,34 @@ async function notify({ client, title, url, sections, cc, emailHtml, meta = {}, 
     }
   }
   const taskUrl = out.task ? out.task.url : "";
+
+  // 2. Save the full package so anyone can open it from the task
+  let packageUrl = "";
+  if (out.task) {
+    try {
+      packageUrl = await savePackage(out.task.taskId, {
+        client, clientName, title: title || "", url: url || "", sections, emailHtml: emailHtml || "",
+        platforms: meta.platforms || "", subject: meta.subject || "", segment: meta.segment || "", fromTopic: !!meta.fromTopic,
+      }, String(by || "").trim());
+      out.task.packageUrl = packageUrl;
+    } catch (err) {
+      out.warnings.push(`The package wasn't saved to the task: ${err.message}`);
+    }
+  }
   const subject = `Promo package ready${meta.fromTopic ? " (from a topic)" : ""}: ${clientName} – ${title || "new content"}`.slice(0, 180);
-  const ccList = String(cc || "")
-    .split(/[,;\s]+/)
-    .map((s) => s.trim())
-    .filter((s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s))
-    // Only team addresses can be CC'd, so nobody can use this page to email outsiders.
-    .filter((s) => ALLOWED_CC_DOMAINS.some((d) => s.toLowerCase().endsWith("@" + d)));
+  const typed = String(cc || "").split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean);
+  // The person who ran it is always copied, so Rodri can reply to them (found by name in TEAM_MEMBERS)
+  const runner = teamMembers().find((m) => by && tasks.same(m.name, by));
+  const candidates = [...(runner && runner.email ? [runner.email] : []), ...typed];
+  const isTeam = (s) => ALLOWED_CC_DOMAINS.some((d) => s.toLowerCase().endsWith("@" + d));
+  const valid = (s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s);
+  const dropped = typed.filter((s) => !valid(s) || !isTeam(s));
+  if (by && !(runner && runner.email)) out.warnings.push(`${by} has no @${ALLOWED_CC_DOMAINS[0]} address in TEAM_MEMBERS, so they weren't copied.`);
+  if (dropped.length) out.warnings.push(`Not copied (only @${ALLOWED_CC_DOMAINS[0]} addresses can be copied): ${dropped.join(", ")}`);
+  // Only team addresses can be CC'd, so nobody can use this page to email outsiders.
+  const ccList = [...new Set(candidates.filter((s) => valid(s) && isTeam(s)).map((s) => s.toLowerCase()))]
+    .filter((s) => !process.env.RODRI_EMAIL || s !== process.env.RODRI_EMAIL.toLowerCase());
+  out.copied = ccList;
   const env = process.env;
 
   if (!env.RESEND_API_KEY || !env.PROMO_FROM || !env.RODRI_EMAIL) {
@@ -873,8 +898,8 @@ async function notify({ client, title, url, sections, cc, emailHtml, meta = {}, 
         cc: ccList.length ? ccList : undefined,
         reply_to: ccList[0] || undefined,
         subject,
-        html: packageHtml({ clientName, url, sections, taskUrl }),
-        text: packageText({ clientName, url, sections, taskUrl }),
+        html: packageHtml({ clientName, url, sections, taskUrl, packageUrl }),
+        text: packageText({ clientName, url, sections, taskUrl, packageUrl }),
         attachments: emailHtml
           ? [{ filename: `${slug || "promo"}-email.html`, content: Buffer.from(emailHtml, "utf8").toString("base64") }]
           : undefined,
