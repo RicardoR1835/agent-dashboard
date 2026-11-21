@@ -97,13 +97,33 @@
     <label for="client">Client</label>
     <select id="client"></select>
 
-    <label for="url">Content link</label>
-    <p class="hint">The blog post or page you're promoting.</p>
-    <input id="url" type="url" placeholder="https://">
+    <fieldset>
+      <legend>Start from</legend>
+      <div class="checks" id="modes">
+        <label><input type="radio" name="mode" value="content" checked> Existing content</label>
+        <label><input type="radio" name="mode" value="topic"> A topic</label>
+      </div>
+    </fieldset>
 
-    <label for="text">Or paste the content</label>
-    <p class="hint">Use this if the page won't load or isn't live yet.</p>
-    <textarea id="text" rows="4"></textarea>
+    <div id="contentFields">
+      <label for="url">Content link</label>
+      <p class="hint">The blog post or page you're promoting.</p>
+      <input id="url" type="url" placeholder="https://">
+
+      <label for="text">Or paste the content</label>
+      <p class="hint">Use this if the page won't load or isn't live yet.</p>
+      <textarea id="text" rows="4"></textarea>
+    </div>
+
+    <div id="topicFields" hidden>
+      <label for="topic">Topic</label>
+      <p class="hint">What to post about. Facts come only from the client's Project docs, so nothing gets made up.</p>
+      <textarea id="topic" rows="3" placeholder="e.g. Book your office holiday party catering early"></textarea>
+
+      <label for="topicLink">Link for the button (optional)</label>
+      <p class="hint">Leave blank to use the booking link or website from the client's docs.</p>
+      <input id="topicLink" type="url" placeholder="https://">
+    </div>
 
     <fieldset>
       <legend>Platforms</legend>
@@ -358,7 +378,12 @@ function composeSegment(s) {
 
 // ---------- send ----------
 function packageSections() {
-  const sections = [{ heading: "Source", items: [[state.content.title, state.content.url].filter(Boolean).join("\n")] }];
+  const sections = [{
+    heading: "Source",
+    items: [state.content.fromTopic
+      ? `Started from a topic (no source page): ${state.content.title}\nButton link: ${$("eUrl").value || "none"}\nFacts came only from the client's Project docs. Check anything marked [ADD: ...] and fill it in before posting.`
+      : [state.content.title, state.content.url].filter(Boolean).join("\n")],
+  }];
   document.querySelectorAll("#posts .platform").forEach((box) => {
     const items = [...box.querySelectorAll(".variant")].map((v) =>
       [v.querySelector(".angle").textContent, v.querySelector("textarea").value, v.querySelector(".visual").textContent].filter(Boolean).join("\n\n"));
@@ -410,6 +435,7 @@ async function sendToRodri() {
         platforms: state.platforms.join(", "),
         subject: subjects()[0] || "",
         segment: state.segment?.primary?.name || "",
+        fromTopic: !!state.content.fromTopic,
       },
     });
     const bits = [];
@@ -427,12 +453,21 @@ async function sendToRodri() {
 }
 
 // ---------- run ----------
+const mode = () => document.querySelector('input[name="mode"]:checked').value;
+document.querySelectorAll('input[name="mode"]').forEach((r) => r.addEventListener("change", () => {
+  $("contentFields").hidden = mode() === "topic";
+  $("topicFields").hidden = mode() !== "topic";
+  $("formError").textContent = "";
+}));
+
 async function run(e) {
   e.preventDefault();
   $("formError").textContent = "";
-  const url = $("url").value.trim(), text = $("text").value.trim();
+  const fromTopic = mode() === "topic";
+  const url = $("url").value.trim(), text = $("text").value.trim(), topic = $("topic").value.trim();
   const platforms = [...document.querySelectorAll("#platforms input:checked")].map((i) => i.value);
-  if (!url && !text) { $("formError").textContent = "Add a content link or paste the content."; $("url").focus(); return; }
+  if (fromTopic && !topic) { $("formError").textContent = "Add a topic."; $("topic").focus(); return; }
+  if (!fromTopic && !url && !text) { $("formError").textContent = "Add a content link or paste the content."; $("url").focus(); return; }
   if (!platforms.length) { $("formError").textContent = "Pick at least one platform."; return; }
 
   state = { client: $("client").value, platforms };
@@ -446,7 +481,7 @@ async function run(e) {
   let current = "extract";
   try {
     mark("extract", "running", "Reading");
-    state.content = await call("extract", { url, text });
+    state.content = await call("extract", fromTopic ? { topic } : { url, text });
     mark("extract", "running", "Reading client docs");
     try {
       const c = await call("context", { client: state.client });
@@ -455,6 +490,13 @@ async function run(e) {
       $("docsNote").textContent = c.sources && c.sources.length
         ? `Using this client's Project docs: ${c.sources.join(", ")}.`
         : (c.note || "");
+      if (state.content.fromTopic) {
+        state.content.url = $("topicLink").value.trim() || c.bookingUrl || c.website || "";
+        if (!(c.sources && c.sources.length)) {
+          $("docsNote").textContent += " Heads up: without the client's docs, a topic run has no facts to draw on, so check every detail.";
+        }
+        if (!state.content.url) $("docsNote").textContent += " No button link was found; add one in the email fields.";
+      }
     } catch (err) {
       state.context = "";
       state.site = null;
