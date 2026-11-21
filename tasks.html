@@ -117,6 +117,20 @@
   .linked { display: grid; gap: .35rem; }
   .linked button { text-align: left; font-weight: 400; display: flex; justify-content: space-between; gap: .5rem; }
   .note { font-size: .875rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: .8rem; margin: 1rem 0 0; }
+  .form { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: .75rem 1rem; }
+  .form .wide { grid-column: 1 / -1; }
+  .form label { display: block; font-size: .85rem; color: var(--muted); font-weight: 500; margin-bottom: .2rem; }
+  .form input, .form select, .form textarea { width: 100%; }
+  .form textarea { min-height: 5.5rem; resize: vertical; padding: .5rem .65rem; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; }
+  .form .hint { font-size: .8rem; color: var(--muted); margin: .2rem 0 0; }
+  .form .need label { color: var(--danger); }
+  .actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin-top: 1rem; }
+  .actions .msg { font-size: .9rem; }
+  .actions .msg.bad { color: var(--danger); }
+  .conflict { background: var(--warn-soft); color: var(--warn); border-radius: 8px; padding: .6rem .8rem; margin-bottom: 1rem; font-size: .9rem; }
+  .toast { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%); background: var(--navy); color: #fff; padding: .65rem 1rem; border-radius: 8px; font-size: .95rem; max-width: calc(100% - 2rem); z-index: 10; }
+  @media (prefers-color-scheme: dark) { .toast { background: var(--gold); color: #191a2e; } }
+  .chip.wait { background: var(--info-soft); color: var(--info); border-color: transparent; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 </style>
 </head>
@@ -130,17 +144,23 @@
 <main id="app" aria-live="polite"></main>
 
 <dialog id="dlg" aria-labelledby="dlgTitle"></dialog>
+<div class="toast" id="toast" role="status" hidden></div>
 
 <script>
 const API = "/.netlify/functions/tasks";
 const KEYS = { code: "occHub.code", me: "occHub.me", view: "occHub.view", client: "occHub.client" };
 const VIEWS = [["mine", "My work"], ["client", "By client"], ["board", "Team board"]];
 // Order for "My work": things that need action first
-const MY_ORDER = ["Changes requested", "In progress", "Needs review", "To do", "Scheduled", "Published", "Backlog"];
+const MY_ORDER = ["Changes requested", "In progress", "To do", "Needs review", "Scheduled", "Published", "Backlog"];
+// Default owner and reviewer per task type (prefills only; anyone can change them)
+const DEFAULTS = {
+  CONTENT: ["Paola", "Kristine"], PROMO: ["Rodri", "Rodri"], EMAIL: ["Rodri", "Kristine"], SOCIAL: ["Rodri", "Paola"],
+  PAID: ["Rodri", "Paola"], SEO: ["Ricky", "Kristine"], WEB: ["Ricky", "Paola"], DESIGN: ["Lina", "Paola"], OPS: ["Kristine", ""],
+};
 const DONE_STATES = ["Published", "Closed"];
 
 const state = {
-  tasks: [], team: [], statuses: [], types: [], warnings: [], clientGroups: null,
+  tasks: [], team: [], statuses: [], types: [], priorities: [], results: [], hasWaitingOn: false, warnings: [], clientGroups: null,
   loadedAt: 0, error: "",
   view: storeGet(KEYS.view) || "mine",
   client: storeGet(KEYS.client) || "",
@@ -200,6 +220,7 @@ function flags(t) {
   const out = [];
   if (isStuck(t)) out.push(`<span class="chip flag">In review ${workingDaysSince(t.statusSince)} days</span>`);
   if (t.priority === "High" && isOpen(t)) out.push(`<span class="chip flag">High</span>`);
+  if (t.waitingOn && isOpen(t)) out.push(`<span class="chip wait">Waiting on ${esc(t.waitingOn)}</span>`);
   return out.join("");
 }
 
@@ -213,7 +234,7 @@ async function load() {
     const data = await res.json().catch(() => ({}));
     if (res.status === 401) { storeSet(KEYS.code, ""); return renderGate(data.error || "That access code didn't work."); }
     if (!res.ok) throw new Error(data.error || `The hub couldn't load tasks (${res.status}).`);
-    Object.assign(state, { tasks: data.tasks || [], team: data.team || [], statuses: data.statuses || [], types: data.types || [], warnings: data.warnings || [], loadedAt: Date.now() });
+    Object.assign(state, { tasks: data.tasks || [], team: data.team || [], statuses: data.statuses || [], types: data.types || [], priorities: data.priorities || [], results: data.results || [], hasWaitingOn: Boolean(data.hasWaitingOn), warnings: data.warnings || [], loadedAt: Date.now() });
   } catch (err) {
     state.error = err.message || "The hub couldn't load tasks. Check your connection and refresh.";
   }
@@ -317,6 +338,7 @@ function render() {
       <div class="tabs" role="tablist" aria-label="Views">${tabs}</div>
       <span class="meta">${loaded ? "Updated " + loaded : ""}</span>
       <button type="button" id="refresh">Refresh</button>
+      <button type="button" class="primary" id="newTask">New task</button>
     </div>
     ${warn}
     ${body}`;
@@ -324,6 +346,7 @@ function render() {
   $("#app").querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => { state.view = b.dataset.view; storeSet(KEYS.view, state.view); render(); }));
   $("#refresh").addEventListener("click", async (e) => { e.target.disabled = true; e.target.textContent = "Refreshing…"; await load(); });
   $("#app").querySelectorAll("[data-task]").forEach((b) => b.addEventListener("click", () => openTask(b.dataset.task)));
+  $("#newTask").addEventListener("click", () => openTask(null));
   bindFilters();
 }
 
@@ -347,14 +370,15 @@ function group(title, list, extraClass, note) {
 function viewMine() {
   const me = storeGet(KEYS.me);
   const mine = state.tasks.filter((t) => sameClient(t.owner, me) && isOpen(t));
-  if (!mine.length) {
+  const toReview = state.tasks.filter((t) => t.status === "Needs review" && sameClient(t.reviewer, me) && !sameClient(t.owner, me)).sort(byDue);
+  if (!mine.length && !toReview.length) {
     return `<div class="empty"><p>Nothing is assigned to you right now.</p><p>Check the <button type="button" data-view="board">Team board</button> for unassigned work.</p></div>`;
   }
   const late = mine.filter(isLate).sort(byDue);
   const rest = mine.filter((t) => !isLate(t));
-  let html = group("Overdue", late, "late");
+  let html = group("Overdue", late, "late") + group("To review", toReview, "", "you're the reviewer");
   for (const s of MY_ORDER) {
-    const label = s === "Published" ? "Published, needs result" : s;
+    const label = s === "Published" ? "Published, needs result" : s === "Needs review" ? "Sent for review" : s;
     html += group(label, rest.filter((t) => t.status === s).sort(byDue));
   }
   return html;
@@ -426,45 +450,168 @@ function linkOrText(v) {
   return u ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a>` : `<p>${esc(v)}</p>`;
 }
 
-function openTask(id) {
-  const t = state.tasks.find((x) => x.taskId === id);
+function opts(list, selected, blank) {
+  return (blank !== undefined ? `<option value="">${esc(blank)}</option>` : "") +
+    list.map((v) => `<option${String(v).toLowerCase() === String(selected || "").toLowerCase() ? " selected" : ""}>${esc(v)}</option>`).join("");
+}
+function teamOpts(selected, blank) {
+  const names = [...state.team];
+  if (selected && !names.some((n) => sameClient(n, selected))) names.push(selected); // keep a name typed in the sheet
+  return opts(names, selected, blank);
+}
+function clientSelect(selected) {
+  const html = clientOptions(selected, "Pick a client");
+  return selected && !html.includes(`value="${esc(selected)}"`) ? html + `<option selected>${esc(selected)}</option>` : html;
+}
+
+// Opens a task to view and edit. id null = new task.
+function openTask(id, notice) {
+  const isNew = !id;
+  const me = storeGet(KEYS.me);
+  const t = isNew
+    ? { taskId: "", client: state.filters.client || "", title: "", type: "", status: "Backlog", owner: "", reviewer: "", priority: "Normal", due: "", brief: "", contentLink: "", publishedLink: "", output: "", result: "", waitingOn: "", parentTask: "" }
+    : state.tasks.find((x) => x.taskId === id);
   if (!t) return;
   const parent = t.parentTask ? state.tasks.find((x) => x.taskId === t.parentTask) : null;
-  const children = state.tasks.filter((x) => x.parentTask === t.taskId);
+  const children = isNew ? [] : state.tasks.filter((x) => x.parentTask === t.taskId);
   const linked = [parent, ...children].filter(Boolean);
-  const fact = (k, v) => `<div><dt>${k}</dt><dd>${v || "None"}</dd></div>`;
-  const field = (k, v, asLink) => (v ? `<div class="field"><h3>${k}</h3>${asLink ? linkOrText(v) : `<p>${esc(v)}</p>`}</div>` : "");
+  const link = (v) => (safeUrl(v) ? ` <a href="${esc(safeUrl(v))}" target="_blank" rel="noopener">Open</a>` : "");
 
   const dlg = $("#dlg");
   dlg.innerHTML = `
+    <form method="dialog" id="taskForm" novalidate>
     <div class="dlg-head">
       <div>
-        <h2 id="dlgTitle">${esc(t.title)}</h2>
-        <p>${esc(t.taskId)}, ${esc(t.client || "no client")}, ${esc(t.type)}</p>
+        <h2 id="dlgTitle">${isNew ? "New task" : esc(t.title)}</h2>
+        <p>${isNew ? "It gets its Task ID when you save." : `${esc(t.taskId)}${t.statusSince ? `, ${esc(t.status)} since ${esc(fmtDay(t.statusSince))}` : ""}${isLate(t) ? ", overdue" : ""}`}</p>
       </div>
-      <button type="button" id="dlgClose" aria-label="Close">Close</button>
+      <button type="button" id="dlgClose">Close</button>
     </div>
     <div class="dlg-body">
-      <dl class="facts">
-        ${fact("Status", `<span class="pill" data-s="${esc(t.status)}">${esc(t.status)}</span>${t.statusSince ? ` since ${esc(fmtDay(t.statusSince))}` : ""}`)}
-        ${fact("Owner", esc(t.owner))}
-        ${fact("Reviewer", esc(t.reviewer))}
-        ${fact("Due", t.due ? `<span${isLate(t) ? ' style="color:var(--danger);font-weight:500"' : ""}>${esc(fmtDay(t.due))}${isLate(t) ? ", overdue" : ""}</span>` : "")}
-        ${fact("Priority", esc(t.priority))}
-        ${fact("Created", esc(fmtDay(t.created)))}
-      </dl>
-      ${field("Brief", t.brief)}
-      ${field("Content link", t.contentLink, true)}
-      ${field("Published link", t.publishedLink, true)}
-      ${field("Output", t.output, true)}
-      ${field("Result", t.result)}
-      ${linked.length ? `<div class="field"><h3>Linked tasks</h3><div class="linked">${linked.map((x) => `<button type="button" data-open="${esc(x.taskId)}"><span>${x === parent ? "From " : ""}${esc(x.taskId)} ${esc(x.title)}</span><span class="pill" data-s="${esc(x.status)}">${esc(x.status)}</span></button>`).join("")}</div></div>` : ""}
-      <p class="note">${t.updatedBy ? `Last changed by ${esc(t.updatedBy)}${t.updatedAt ? " on " + esc(/^\d{4}-\d{2}-\d{2}$/.test(t.updatedAt) ? fmtDay(t.updatedAt) : new Date(t.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })) : ""}. ` : ""}To change this task for now, edit row ${esc(t.row)} of the Tasks sheet. Editing here comes next.</p>
-    </div>`;
+      ${notice ? `<p class="conflict">${esc(notice)}</p>` : ""}
+      <div class="form">
+        <div class="wide"><label for="f_title">Title</label><input id="f_title" value="${esc(t.title)}" maxlength="200" placeholder="Holiday menu blog"></div>
+        <div><label for="f_client">Client</label><select id="f_client">${clientSelect(t.client)}</select></div>
+        <div><label for="f_type">Type</label><select id="f_type">${opts(state.types, t.type, "Pick a type")}</select></div>
+        <div><label for="f_status">Status</label><select id="f_status">${opts(state.statuses, t.status)}</select></div>
+        <div><label for="f_priority">Priority</label><select id="f_priority">${opts(state.priorities.length ? state.priorities : ["High", "Normal", "Low"], t.priority)}</select></div>
+        <div><label for="f_owner">Owner</label><select id="f_owner">${teamOpts(t.owner, "Unassigned")}</select></div>
+        <div><label for="f_reviewer">Reviewer</label><select id="f_reviewer">${teamOpts(t.reviewer, "None")}</select></div>
+        <div><label for="f_due">Due</label><input id="f_due" type="date" value="${esc(/^\d{4}-\d{2}-\d{2}$/.test(t.due) ? t.due : "")}"></div>
+        ${state.hasWaitingOn ? `<div><label for="f_waitingOn">Waiting on</label><input id="f_waitingOn" value="${esc(t.waitingOn)}" placeholder="Client approval, account access" maxlength="80"></div>` : ""}
+        <div class="wide"><label for="f_brief">Brief</label><textarea id="f_brief" placeholder="What's needed, links, notes">${esc(t.brief)}</textarea></div>
+        <div class="wide"><label for="f_contentLink">Content link${link(t.contentLink)}</label><input id="f_contentLink" type="url" value="${esc(t.contentLink)}" placeholder="https://"></div>
+        <div class="wide" id="w_published"><label for="f_publishedLink">Published link${link(t.publishedLink)}</label><input id="f_publishedLink" type="url" value="${esc(t.publishedLink)}" placeholder="https://"><p class="hint">Required to mark it Published.</p></div>
+        <div class="wide"><label for="f_output">Output${link(t.output)}</label><input id="f_output" value="${esc(t.output)}" placeholder="Link to the draft, package or log row"></div>
+        <div class="wide" id="w_result"><label for="f_result">Result</label><input id="f_result" list="resultList" value="${esc(t.result)}" placeholder="Used as-is, Light edit, Rewrote or Didn't use, plus a note"><datalist id="resultList">${(state.results || []).map((r) => `<option value="${esc(r)}">`).join("")}</datalist><p class="hint">Required to close the task.</p></div>
+      </div>
+      ${linked.length ? `<div class="field" style="margin-top:1rem"><h3>Linked tasks</h3><div class="linked">${linked.map((x) => `<button type="button" data-open="${esc(x.taskId)}"><span>${x === parent ? "From " : ""}${esc(x.taskId)} ${esc(x.title)}</span><span class="pill" data-s="${esc(x.status)}">${esc(x.status)}</span></button>`).join("")}</div></div>` : ""}
+      <div class="actions">
+        <button type="submit" class="primary" id="save">${isNew ? "Create task" : "Save changes"}</button>
+        <span class="msg" id="saveMsg"></span>
+      </div>
+      ${isNew ? "" : `<p class="note">${t.updatedBy ? `Last changed by ${esc(t.updatedBy)}${t.updatedAt ? " on " + esc(/^\d{4}-\d{2}-\d{2}$/.test(t.updatedAt) ? fmtDay(t.updatedAt) : new Date(t.updatedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })) : ""}. ` : ""}Changing the owner, sending for review or requesting changes emails the person who has it next.</p>`}
+    </div>
+    </form>`;
+
+  // New tasks: prefill owner and reviewer from the type, until someone picks them by hand
+  let touched = { owner: !isNew, reviewer: !isNew };
+  $("#f_owner").addEventListener("change", () => (touched.owner = true));
+  $("#f_reviewer").addEventListener("change", () => (touched.reviewer = true));
+  $("#f_type").addEventListener("change", (e) => {
+    const d = DEFAULTS[e.target.value];
+    if (!d) return;
+    if (!touched.owner) $("#f_owner").value = d[0];
+    if (!touched.reviewer) $("#f_reviewer").value = d[1];
+    if (isNew && $("#f_status").value === "Backlog" && $("#f_owner").value) $("#f_status").value = "To do";
+  });
+  $("#taskForm").addEventListener("input", () => { $("#saveMsg").textContent = ""; $("#saveMsg").className = "msg"; document.querySelectorAll(".form .need").forEach((n) => n.classList.remove("need")); });
+
   $("#dlgClose").onclick = () => dlg.close();
   dlg.querySelectorAll("[data-open]").forEach((b) => (b.onclick = () => openTask(b.dataset.open)));
-  if (location.hash !== "#" + id) history.replaceState(null, "", "#" + id);
+  $("#taskForm").addEventListener("submit", (e) => { e.preventDefault(); saveTask(t, isNew); });
+  if (!isNew && location.hash !== "#" + id) history.replaceState(null, "", "#" + id);
   if (!dlg.open) dlg.showModal();
+  if (isNew) $("#f_title").focus();
+}
+
+function readForm() {
+  const v = (id) => { const el = $("#f_" + id); return el ? el.value.trim() : undefined; };
+  const out = {};
+  for (const k of ["title", "client", "type", "status", "priority", "owner", "reviewer", "due", "brief", "contentLink", "publishedLink", "output", "result", "waitingOn"]) {
+    const val = v(k);
+    if (val !== undefined) out[k] = val;
+  }
+  return out;
+}
+
+// Same rules the server checks, so people see the problem right away
+function formProblem(f) {
+  if (!f.title) return ["title", "Give the task a title."];
+  if (!f.client) return ["client", "Pick a client."];
+  if (!f.type) return ["type", "Pick a task type."];
+  if (f.status !== "Backlog" && !f.owner) return ["owner", "Pick an owner. Only Backlog tasks can be unassigned."];
+  if (f.status === "Needs review" && !f.reviewer) return ["reviewer", "Pick a reviewer before sending this for review."];
+  if (f.status === "Published" && !safeUrl(f.publishedLink)) return ["publishedLink", "Add the published link (starting with https://) before marking this Published."];
+  if (f.status === "Closed" && !f.result) return ["result", "Fill in the Result before closing the task."];
+  return null;
+}
+
+async function saveTask(t, isNew) {
+  const f = readForm();
+  const bad = formProblem(f);
+  const msg = $("#saveMsg");
+  if (bad) {
+    const field = $("#f_" + bad[0]);
+    if (field) { field.closest("div").classList.add("need"); field.focus(); }
+    msg.textContent = bad[1]; msg.className = "msg bad";
+    return;
+  }
+  const changes = {};
+  for (const [k, val] of Object.entries(f)) if (isNew || String(t[k] || "") !== val) changes[k] = val;
+  if (!isNew && !Object.keys(changes).length) { $("#dlg").close(); return; }
+
+  const btn = $("#save");
+  btn.disabled = true;
+  msg.textContent = "Saving…"; msg.className = "msg";
+  const me = storeGet(KEYS.me);
+  const payload = isNew
+    ? { action: "create", task: f, by: me }
+    : { action: "update", taskId: t.taskId, changes, expectedUpdatedAt: t.updatedAt || "", by: me };
+  try {
+    const res = await fetch(API, { method: "POST", headers: { "content-type": "application/json", "x-team-code": storeGet(KEYS.code) }, body: JSON.stringify(payload) });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) { storeSet(KEYS.code, ""); $("#dlg").close(); return renderGate(data.error); }
+    if (res.status === 409 && data.current) {
+      replaceTask(data.current);
+      render();
+      return openTask(data.current.taskId, data.error);
+    }
+    if (!res.ok) throw new Error(data.error || `Couldn't save (${res.status}).`);
+    replaceTask(data.task);
+    $("#dlg").close();
+    render();
+    const parts = [isNew ? `Created ${data.task.taskId}` : "Saved"];
+    if (data.emailed && data.emailed.length) parts.push(`emailed ${data.emailed.join(" and ")}`);
+    toast(parts.join(", ") + "." + (data.warnings && data.warnings.length ? " " + data.warnings.join(" ") : ""));
+  } catch (err) {
+    btn.disabled = false;
+    msg.textContent = err.message || "Couldn't save. Check your connection and try again."; msg.className = "msg bad";
+  }
+}
+
+function replaceTask(task) {
+  const i = state.tasks.findIndex((x) => x.taskId === task.taskId);
+  if (i === -1) state.tasks.push(task); else state.tasks[i] = task;
+}
+
+let toastTimer;
+function toast(text) {
+  const el = $("#toast");
+  el.textContent = text;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (el.hidden = true), text.length > 80 ? 9000 : 4500);
 }
 
 $("#dlg").addEventListener("close", () => history.replaceState(null, "", location.pathname + location.search));
