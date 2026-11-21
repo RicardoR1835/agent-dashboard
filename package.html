@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Promo package · OverCoffee</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #191a2e; --gold: #c9a84c;
+    --bg: #f3f4f7; --surface: #ffffff; --ink: #191a2e; --muted: #555872; --line: #d8dae3;
+    --accent: #8a6d1f; --accent-soft: #f6efdb; --danger: #a12d2d; --danger-soft: #fbeaea; --ok: #2f6b3a;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11121d; --surface: #1b1c2c; --ink: #ecebe6; --muted: #a6a8bb; --line: #33354b;
+      --accent: #d9bb6a; --accent-soft: #2c2918; --danger: #f09a9a; --danger-soft: #3a1d1f; --ok: #8fd19a;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 400 1rem/1.5 "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { background: var(--navy); color: #f3f1ea; padding: 1rem 1.5rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+  header h1 { margin: 0 auto 0 0; font-size: 1.25rem; font-weight: 600; }
+  header h1 span { color: var(--gold); }
+  header a { color: #f3f1ea; }
+  header nav { display: flex; gap: 1rem; font-size: .95rem; }
+  main { max-width: 1000px; margin: 0 auto; padding: 1.5rem 1.5rem 3rem; }
+  button, .btn { font: inherit; font-weight: 500; border-radius: 8px; cursor: pointer; padding: .45rem .8rem; border: 1px solid var(--line); background: var(--surface); color: var(--ink); text-decoration: none; display: inline-block; }
+  button.primary { background: var(--navy); color: #fff; border-color: var(--navy); }
+  @media (prefers-color-scheme: dark) { button.primary { background: var(--gold); color: #191a2e; border-color: var(--gold); } }
+  button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  input { padding: .5rem .65rem; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; width: 100%; margin: .35rem 0 1rem; }
+  .gate { max-width: 420px; margin: 3rem auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 1.5rem; }
+  .gate h2 { margin: 0 0 .25rem; font-size: 1.2rem; }
+  .gate p { color: var(--muted); margin: 0 0 1rem; }
+  .error { color: var(--danger); }
+  .fail { background: var(--danger-soft); color: var(--danger); border-radius: 8px; padding: .8rem 1rem; }
+  .title h2 { margin: 0; font-size: 1.4rem; font-weight: 600; }
+  .meta { color: var(--muted); margin: .3rem 0 0; font-size: .95rem; }
+  .meta a, .note a { color: var(--accent); overflow-wrap: anywhere; }
+  .actions { display: flex; gap: .5rem; flex-wrap: wrap; margin: 1rem 0 1.5rem; }
+  .note { font-size: .9rem; color: var(--muted); }
+  section { margin-bottom: 2rem; }
+  section > h3 { font-size: 1.1rem; font-weight: 600; margin: 0 0 .75rem; padding-bottom: .3rem; border-bottom: 2px solid var(--gold); }
+  .items { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+  .item { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 1rem; display: flex; flex-direction: column; gap: .75rem; }
+  .item p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; flex: 1; }
+  .item button { align-self: flex-start; }
+  iframe { width: 100%; height: 720px; border: 1px solid var(--line); border-radius: 10px; background: #f2f3f6; }
+</style>
+</head>
+<body>
+<header>
+  <h1>OverCoffee <span>Promo package</span></h1>
+  <nav><a href="/tasks.html">Task Hub</a><a href="/promo.html">Promo sequence</a></nav>
+</header>
+<main id="app" aria-live="polite"><p class="note">Loading…</p></main>
+
+<script>
+const KEYS = { code: "occHub.code" };
+const get = (k) => { try { return localStorage.getItem(k) || ""; } catch (_) { return ""; } };
+const set = (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch (_) {} };
+const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const safeUrl = (u) => (/^https?:\/\//i.test(String(u || "").trim()) ? String(u).trim() : "");
+const app = document.getElementById("app");
+const taskId = decodeURIComponent(location.hash.slice(1));
+let pkg = null;
+
+function gate(message) {
+  app.innerHTML = `<form class="gate" id="gate" novalidate>
+    <h2>Team sign-in</h2><p>Enter the team access code (the same one as the Task Hub).</p>
+    <label for="code">Access code</label><input id="code" type="password" autocomplete="current-password">
+    <button class="primary" type="submit">Open the package</button>
+    <p class="error">${esc(message || "")}</p></form>`;
+  document.getElementById("code").focus();
+  document.getElementById("gate").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const v = document.getElementById("code").value.trim();
+    if (!v) return;
+    set(KEYS.code, v);
+    load();
+  });
+}
+
+async function load() {
+  if (!taskId) { app.innerHTML = `<p class="fail">No task given. Open this page from a task's View package button.</p>`; return; }
+  if (!get(KEYS.code)) return gate();
+  try {
+    const res = await fetch(`/.netlify/functions/tasks?package=${encodeURIComponent(taskId)}`, { headers: { "x-team-code": get(KEYS.code) } });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) { set(KEYS.code, ""); return gate(data.error || "That access code didn't work."); }
+    if (!res.ok) throw new Error(data.error || `Couldn't load the package (${res.status}).`);
+    pkg = data.package;
+    render();
+  } catch (err) {
+    app.innerHTML = `<p class="fail">${esc(err.message)}</p><p class="note"><a href="/tasks.html#${encodeURIComponent(taskId)}">Back to ${esc(taskId)}</a></p>`;
+  }
+}
+
+function render() {
+  const when = pkg.savedAt ? new Date(pkg.savedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+  const link = safeUrl(pkg.url);
+  // The "HTML is attached" line only makes sense in the email; here the preview replaces it
+  const sections = (pkg.sections || []).map((s) => ({ ...s, items: (s.items || []).filter((t) => !/HTML email is attached/i.test(t)) })).filter((s) => s.items.length);
+  let n = 0;
+  app.innerHTML = `
+    <div class="title">
+      <h2>${esc(pkg.title || "Promo package")}</h2>
+      <p class="meta">${esc(pkg.clientName || pkg.client || "")}${link ? ` · <a href="${esc(link)}" target="_blank" rel="noopener">${esc(link)}</a>` : ""}</p>
+      <p class="meta">Task <a href="/tasks.html#${encodeURIComponent(taskId)}">${esc(taskId)}</a>${pkg.builtBy ? ` · built by ${esc(pkg.builtBy)}` : ""}${when ? ` · ${esc(when)}` : ""}${pkg.versions > 1 ? ` · newest of ${pkg.versions} versions` : ""}</p>
+    </div>
+    <div class="actions">
+      <button type="button" id="copyAll">Copy everything</button>
+      ${pkg.emailHtml ? `<button type="button" id="copyHtml">Copy email HTML</button><button type="button" id="dlHtml">Download email HTML</button>` : ""}
+    </div>
+    ${sections.map((s) => `<section><h3>${esc(s.heading)}</h3><div class="items">${s.items.map((t) => `<div class="item"><p id="it${n}">${esc(t)}</p><button type="button" data-copy="it${n++}">Copy</button></div>`).join("")}</div></section>`).join("")}
+    ${pkg.emailHtml ? `<section><h3>Email preview</h3><iframe id="preview" title="Email preview" sandbox=""></iframe></section>` : `<p class="note">${esc(pkg.note || "No email HTML was saved with this package.")}</p>`}`;
+
+  if (pkg.emailHtml) {
+    document.getElementById("preview").srcdoc = pkg.emailHtml;
+    document.getElementById("copyHtml").onclick = (e) => copy(pkg.emailHtml, e.target);
+    document.getElementById("dlHtml").onclick = () => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([pkg.emailHtml], { type: "text/html" }));
+      a.download = `${String(pkg.clientName || "promo").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-email.html`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    };
+  }
+  document.getElementById("copyAll").onclick = (e) => copy(sections.map((s) => `== ${s.heading} ==\n\n${s.items.join("\n\n---\n\n")}`).join("\n\n"), e.target);
+  app.querySelectorAll("[data-copy]").forEach((b) => (b.onclick = () => copy(document.getElementById(b.dataset.copy).textContent, b)));
+  document.title = `${pkg.title || "Promo package"} · OverCoffee`;
+}
+
+async function copy(text, btn) {
+  const old = btn.textContent;
+  try { await navigator.clipboard.writeText(text); btn.textContent = "Copied"; }
+  catch (_) { btn.textContent = "Couldn't copy"; }
+  setTimeout(() => (btn.textContent = old), 1400);
+}
+
+window.addEventListener("hashchange", () => location.reload());
+load();
+</script>
+</body>
+</html>
