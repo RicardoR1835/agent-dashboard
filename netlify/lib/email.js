@@ -40,4 +40,20 @@ async function sendEmail({ to, subject, intro, lines = [], link, linkText }) {
   }
 }
 
-module.exports = { emailReady, sendEmail };
+// One email to several company addresses (used by the Monday digest).
+async function sendBulk({ to, subject, html, text }) {
+  const list = [...new Set((to || []).map((s) => String(s).trim().toLowerCase()))].filter((s) => s.endsWith("@" + ALLOWED_EMAIL_DOMAIN));
+  if (!list.length) throw new Error("No @" + ALLOWED_EMAIL_DOMAIN + " addresses to send to.");
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "content-type": "application/json" },
+    body: JSON.stringify({ from: process.env.TASKS_FROM || process.env.PROMO_FROM, to: list, subject, html, text }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || `Resend returned ${res.status}`);
+  }
+  return list;
+}
+
+module.exports = { emailReady, sendEmail, sendBulk };
