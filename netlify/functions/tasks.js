@@ -1,6 +1,7 @@
 // netlify/functions/tasks.js
 // OverCoffee Task Hub: tasks API. The sheet logic lives in netlify/lib/tasks-store.js.
 //   GET                                   every task in the Tasks tab, plus the team list
+//   POST { action: "digest", send }      preview the Monday digest, or send it now (send: true)
 //   GET ?package=T-0041                   the saved promo package for that task (package.html)
 //   POST { action: "create", task, by }   adds a task with the next Task ID
 //   POST { action: "update", taskId, changes, expectedUpdatedAt, by }
@@ -18,6 +19,7 @@ const { checkAccess, teamMembers } = require("../lib/auth");
 const { googleReady } = require("../lib/google");
 const store = require("../lib/tasks-store");
 const { getPackage } = require("../lib/packages");
+const { buildDigest, sendDigest, recipients } = require("../lib/digest");
 
 const json = (statusCode, body) => ({
   statusCode,
@@ -41,6 +43,16 @@ exports.handler = async (event) => {
       let body;
       try { body = JSON.parse(event.body || "{}"); } catch { return json(400, { error: "Request body isn't valid JSON." }); }
       if (body.action === "create") return reply(await store.createTask(body.task, body.by));
+      // Monday digest by hand: preview it, or send it to the team now
+      if (body.action === "digest") {
+        if (body.send) {
+          const r = await sendDigest();
+          return json(200, { sent: true, sentTo: r.sentTo, subject: r.subject });
+        }
+        const { tasks } = await store.loadAll();
+        const d = buildDigest(tasks);
+        return json(200, { subject: d.subject, html: d.html, recipients: recipients() });
+      }
       if (body.action === "update") return reply(await store.updateTask(body.taskId, body.changes, body.by, { expectedUpdatedAt: body.expectedUpdatedAt }));
       return json(400, { error: `Unknown action: ${body.action}` });
     }
