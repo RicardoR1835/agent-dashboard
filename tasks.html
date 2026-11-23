@@ -423,6 +423,7 @@ function viewBoard() {
     <label class="sr" for="bOwner">Owner</label><select id="bOwner" data-filter="owner"><option value="">Everyone</option>${owners.map((o) => `<option${o === f.owner ? " selected" : ""}>${esc(o)}</option>`).join("")}</select>
     <label class="sr" for="bType">Type</label><select id="bType" data-filter="type"><option value="">All types</option>${state.types.map((t) => `<option${t === f.type ? " selected" : ""}>${esc(t)}</option>`).join("")}</select>
     ${f.client || f.owner || f.type ? `<button type="button" id="clearFilters">Clear filters</button>` : ""}
+    <button type="button" id="digestBtn" style="margin-left:auto">Monday digest</button>
   </div>`;
   const cols = state.statuses.map((s) => {
     const list = shown.filter((t) => t.status === s).sort((a, b) => (isLate(b) - isLate(a)) || byDue(a, b));
@@ -443,6 +444,8 @@ function bindFilters() {
     else state.filters[sel.dataset.filter] = sel.value;
     render();
   }));
+  const dg = $("#digestBtn");
+  if (dg) dg.addEventListener("click", openDigest);
   const clear = $("#clearFilters");
   if (clear) clear.addEventListener("click", () => { state.filters = { client: "", owner: "", type: "" }; render(); });
 }
@@ -625,6 +628,43 @@ async function saveTask(t, isNew) {
     btn.disabled = false;
     msg.textContent = err.message || "Couldn't save. Check your connection and try again."; msg.className = "msg bad";
   }
+}
+
+// Monday digest: it sends itself at 8:00 Central every Monday; this previews it or sends it now
+async function digestCall(send) {
+  const res = await fetch(API, { method: "POST", headers: { "content-type": "application/json", "x-team-code": storeGet(KEYS.code) }, body: JSON.stringify({ action: "digest", send }) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Couldn't build the digest (${res.status}).`);
+  return data;
+}
+async function openDigest() {
+  const dlg = $("#dlg");
+  dlg.innerHTML = `<div class="dlg-head"><div><h2 id="dlgTitle">Monday digest</h2><p>Sends itself every Monday at 8:00 a.m. Central. This is what it looks like right now.</p></div><button type="button" id="dlgClose">Close</button></div>
+    <div class="dlg-body"><p class="note" id="dgInfo" style="border:0;margin:0 0 .75rem;padding:0">Building…</p>
+    <iframe id="dgFrame" title="Digest preview" sandbox="allow-popups allow-popups-to-escape-sandbox" style="width:100%;height:60vh;border:1px solid var(--line);border-radius:8px;background:#f3f4f7"></iframe>
+    <div class="actions"><button type="button" class="primary" id="dgSend" disabled>Send to the team now</button><span class="msg" id="dgMsg"></span></div></div>`;
+  $("#dlgClose").onclick = () => dlg.close();
+  if (!dlg.open) dlg.showModal();
+  try {
+    const d = await digestCall(false);
+    $("#dgInfo").textContent = `${d.subject}. Goes to: ${d.recipients.join(", ") || "nobody yet (check TEAM_MEMBERS)"}.`;
+    $("#dgFrame").srcdoc = d.html.replace("<head>", "<head><base target=\"_blank\">").replace("<html>", "<html><head><base target=\"_blank\"></head>");
+    $("#dgSend").disabled = !d.recipients.length;
+  } catch (err) {
+    $("#dgInfo").textContent = err.message;
+  }
+  $("#dgSend").onclick = async (e) => {
+    if (!confirm("Email this digest to the whole team now?")) return;
+    e.target.disabled = true;
+    $("#dgMsg").textContent = "Sending…"; $("#dgMsg").className = "msg";
+    try {
+      const r = await digestCall(true);
+      $("#dgMsg").textContent = `Sent to ${r.sentTo.length} people.`;
+    } catch (err) {
+      e.target.disabled = false;
+      $("#dgMsg").textContent = err.message; $("#dgMsg").className = "msg bad";
+    }
+  };
 }
 
 function replaceTask(task) {
