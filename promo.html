@@ -84,6 +84,761 @@
   .send { border-top: 1px solid var(--line); padding-top: 1.25rem; }
   .warn { background: var(--danger-soft); color: var(--danger); border-radius: 8px; padding: .6rem .8rem; font-size: .9rem; margin-top: .75rem; }
   .ok { color: var(--ok); }
+  [hidden] { display: none !important; }
+  .idea { border: 1px solid var(--line); border-radius: 10px; padding: .8rem 1rem; margin-bottom: .6rem; display: grid; grid-template-columns: auto 1fr; gap: .25rem .75rem; align-items: start; }
+  .idea input[type=checkbox] { margin-top: .55rem; width: 1.1rem; height: 1.1rem; }
+  .idea .ititle { font-weight: 500; width: 100%; }
+  .idea .imeta { font-size: .85rem; color: var(--accent); font-weight: 500; margin: .2rem 0 0; }
+  .idea .iangle, .idea .ivisual { margin: .15rem 0 0; font-size: .9rem; }
+  .idea .ivisual { color: var(--muted); }
+  .idea .irow { grid-column: 2; margin-top: .35rem; }
+  .tasknote { border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; padding: .7rem .9rem; margin-bottom: 1rem; font-size: .95rem; }
+  .tasknote a, .ok a { color: var(--accent); }
+  .codebox { border: 1px solid var(--line); border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+  .codebox .row input { flex: 1; min-width: 10rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>OverCoffee <span>Promo sequence</span></h1>
+  <nav style="display:flex;gap:1rem"><a href="/tasks.html">Task Hub</a><a href="/">Back to dashboard</a></nav>
+</header>
+
+<div class="wrap">
+  <div class="codebox" id="codeBox" hidden>
+    <label for="teamCode">Team access code</label>
+    <p class="hint">Same code as the Task Hub. You only enter it once on this browser.</p>
+    <div class="row"><input id="teamCode" type="password" autocomplete="current-password"><button type="button" id="codeBtn">Continue</button></div>
+    <p class="error" id="codeErr" role="alert"></p>
+  </div>
+  <div class="tasknote" id="taskNote" hidden></div>
+  <form id="f" novalidate>
+    <label for="client">Client</label>
+    <select id="client"></select>
+
+    <fieldset>
+      <legend>Start from</legend>
+      <div class="checks" id="modes">
+        <label><input type="radio" name="mode" value="content" checked> Existing content</label>
+        <label><input type="radio" name="mode" value="topic"> A topic</label>
+        <label><input type="radio" name="mode" value="ideas"> Ideas for the calendar</label>
+      </div>
+    </fieldset>
+
+    <div id="contentFields">
+      <label for="url">Content link</label>
+      <p class="hint">The blog post or page you're promoting.</p>
+      <input id="url" type="url" placeholder="https://">
+
+      <label for="text">Or paste the content</label>
+      <p class="hint">Use this if the page won't load or isn't live yet.</p>
+      <textarea id="text" rows="4"></textarea>
+    </div>
+
+    <div id="topicFields" hidden>
+      <label for="topic">Topic</label>
+      <p class="hint">What to post about. Facts come only from the client's Project docs, so nothing gets made up.</p>
+      <textarea id="topic" rows="3" placeholder="e.g. Book your office holiday party catering early"></textarea>
+
+      <label for="topicLink">Link for the button (optional)</label>
+      <p class="hint">Leave blank to use the booking link or website from the client's docs.</p>
+      <input id="topicLink" type="url" placeholder="https://">
+    </div>
+
+    <div id="ideaFields" hidden>
+      <label for="ideaMonth">Month</label>
+      <select id="ideaMonth"></select>
+      <label for="ideaCount">How many ideas</label>
+      <select id="ideaCount"><option>8</option><option selected>10</option><option>12</option></select>
+      <label for="ideaTheme">Theme (optional)</label>
+      <p class="hint">A push for this month, like "holiday parties" or "Black Friday". Leave blank for a normal mix.</p>
+      <input id="ideaTheme" type="text" placeholder="e.g. holiday parties">
+      <p class="hint" style="margin-top:.75rem">Ideas are spread across the client's content pillars (the Content pillars column in Client Profiles) and skip topics already in the Task Hub.</p>
+    </div>
+
+    <fieldset>
+      <legend>Platforms</legend>
+      <div class="checks" id="platforms">
+        <label><input type="checkbox" value="Instagram" checked> Instagram</label>
+        <label><input type="checkbox" value="Facebook" checked> Facebook</label>
+        <label><input type="checkbox" value="LinkedIn"> LinkedIn</label>
+        <label><input type="checkbox" value="Google Business Profile"> Google Business</label>
+        <label><input type="checkbox" value="X"> X</label>
+      </div>
+    </fieldset>
+
+    <div id="goalField">
+    <label for="goal">What should people do?</label>
+    <input id="goal" type="text" placeholder="e.g. book a table for the holidays">
+    </div>
+
+    <label for="language">Language</label>
+    <select id="language"><option>English</option><option>Spanish</option></select>
+
+    <div id="promoOnly">
+    <label for="segments">Existing segments or lists</label>
+    <p class="hint">Paste names from Klaviyo, Mailchimp, SFMC or GoHighLevel so the suggestion picks a real one.</p>
+    <textarea id="segments" rows="3"></textarea>
+
+    <label for="cc">Send a copy to</label>
+    <p class="hint">You're copied automatically. Add other @overcoffeeconsulting.com addresses here, separated by commas.</p>
+    <input id="cc" type="text" placeholder="name@overcoffeeconsulting.com">
+
+    <label class="inline" style="margin-top:1rem"><input type="checkbox" id="autoping" checked> Email Rodri when it's ready</label>
+    </div>
+
+    <button class="primary" id="run" type="submit">Build promo package</button>
+    <p class="error" id="formError" role="alert"></p>
+  </form>
+
+  <main class="panel" aria-live="polite">
+    <ol class="rail" id="rail">
+      <li data-step="extract">Read content<small></small></li>
+      <li data-step="social">Social posts<small></small></li>
+      <li data-step="email">Email<small></small></li>
+      <li data-step="segment">Segment<small></small></li>
+      <li data-step="notify">Email Rodri<small></small></li>
+    </ol>
+
+    <p class="empty" id="empty">Pick a client, add the content, and build. You'll get two post examples per platform, a branded HTML email and a suggested segment, all editable here before anything goes to Rodri.</p>
+
+    <p class="hint" id="docsNote"></p>
+    <section class="out" id="ideasOut" hidden>
+      <h2>Content ideas</h2>
+      <p class="hint" id="ideasNote"></p>
+      <div id="ideaList"></div>
+      <div class="row" style="margin-top:1rem">
+        <button class="primary" type="button" id="addIdeasBtn">Add to Task Hub backlog</button>
+        <span id="addIdeasStatus" class="hint"></span>
+      </div>
+    </section>
+
+    <section class="out" id="socialOut" hidden><h2>Social posts</h2><div id="posts"></div></section>
+
+    <section class="out" id="emailOut" hidden>
+      <h2>Promo email</h2>
+      <div class="emailgrid">
+        <div class="card">
+          <p class="hint" id="profileNote"></p>
+          <label for="eSubjects">Subject line options</label>
+          <p class="hint">The first line is used in the HTML.</p>
+          <textarea id="eSubjects" rows="3"></textarea>
+          <label for="ePre">Preheader</label><input id="ePre" type="text">
+          <label for="eHead">Headline</label><input id="eHead" type="text">
+          <label for="eBody">Body</label><textarea id="eBody" rows="9"></textarea>
+          <label for="eCta">Button text</label><input id="eCta" type="text">
+          <label for="eUrl">Button link</label><input id="eUrl" type="url">
+          <label for="ePs">P.S.</label><input id="ePs" type="text">
+          <label for="eHero">Hero image link (optional)</label>
+          <p class="hint">A hosted JPG or PNG (https://), about 1200px wide. Shows full width under the header.</p>
+          <input id="eHero" type="url" placeholder="https://">
+        </div>
+        <div>
+          <iframe class="preview" id="preview" title="Email preview" sandbox=""></iframe>
+          <div class="row">
+            <button type="button" id="copyHtml">Copy HTML</button>
+            <button type="button" id="dlHtml">Download HTML</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="out" id="segmentOut" hidden>
+      <h2>Suggested segment</h2>
+      <div class="card"><textarea id="segmentText" rows="10" aria-label="Suggested segment"></textarea>
+        <div class="row"><button type="button" data-copy="segmentText">Copy segment</button></div></div>
+    </section>
+
+    <section class="out send" id="sendOut" hidden>
+      <div class="row">
+        <button type="button" id="sendBtn">Email Rodri</button>
+        <button type="button" id="refineBtn">Refine in Claude</button>
+        <span id="sendStatus"></span>
+      </div>
+      <p class="hint" id="refineHint">Copies the whole package and opens this client's Claude Project. Paste it there and ask for changes.</p>
+      <div id="sendWarn"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const PROJECTS = {};
+const FALLBACK_GROUPS = [{ label: "Clients", clients: [{ code: "OCC", name: "OverCoffee Consulting" }] }];
+let state = {};
+
+// Shared with the Task Hub (same site, same browser)
+const HUB = { code: "occHub.code", me: "occHub.me" };
+const hubGet = (k) => { try { return localStorage.getItem(k) || ""; } catch (_) { return ""; } };
+const hubSet = (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch (_) {} };
+const params = new URLSearchParams(location.search);
+let linkedTaskId = (params.get("task") || "").trim();
+
+async function call(step, payload) {
+  const res = await fetch("/.netlify/functions/promo", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-team-code": hubGet(HUB.code) },
+    body: JSON.stringify({ step, ...payload }),
+  });
+  let data;
+  try { data = await res.json(); } catch { throw new Error(`The server didn't respond properly (${res.status}). Netlify may have timed out; run it again.`); }
+  if (res.status === 401) { hubSet(HUB.code, ""); askForCode(data.error); throw new Error("Enter the team access code first."); }
+  if (!res.ok || data.error) throw new Error(data.error || `Server error ${res.status}`);
+  return data;
+}
+
+function askForCode(message) {
+  $("codeBox").hidden = false;
+  $("codeErr").textContent = message || "";
+  $("teamCode").focus();
+}
+
+function mark(step, status, note) {
+  const li = document.querySelector(`#rail li[data-step="${step}"]`);
+  li.className = status;
+  li.querySelector("small").textContent = note || "";
+}
+function resetRail() {
+  document.querySelectorAll("#rail li").forEach((li) => { li.className = ""; li.querySelector("small").textContent = ""; });
+}
+function flash(btn, text) { const old = btn.textContent; btn.textContent = text; setTimeout(() => (btn.textContent = old), 1400); }
+
+document.addEventListener("click", async (e) => {
+  const id = e.target.dataset && e.target.dataset.copy;
+  if (!id) return;
+  try { await navigator.clipboard.writeText($(id).value); flash(e.target, "Copied"); } catch { $(id).select(); }
+});
+
+// ---------- social ----------
+function renderPosts(results) {
+  const wrap = $("posts"); wrap.innerHTML = "";
+  results.forEach((p, i) => {
+    const box = document.createElement("div"); box.className = "platform";
+    const h = document.createElement("h3"); h.textContent = p.platform; box.append(h);
+    const grid = document.createElement("div"); grid.className = "variants";
+    if (p.error) {
+      const w = document.createElement("div"); w.className = "warn"; w.textContent = `Couldn't write ${p.platform} posts: ${p.error}`; grid.append(w);
+    }
+    (p.variations || []).forEach((v, j) => {
+      const id = `post-${i}-${j}`;
+      const col = document.createElement("div"); col.className = "variant";
+      const a = document.createElement("div"); a.className = "angle"; a.textContent = `Option ${j + 1}${v.angle ? ": " + v.angle : ""}`;
+      const ta = document.createElement("textarea"); ta.id = id; ta.setAttribute("aria-label", `${p.platform} option ${j + 1}`);
+      ta.value = [v.copy, (v.hashtags || []).join(" ")].filter(Boolean).join("\n\n");
+      const vis = document.createElement("p"); vis.className = "visual"; vis.textContent = v.visual ? `Visual: ${v.visual}` : "";
+      const row = document.createElement("div"); row.className = "row";
+      const b = document.createElement("button"); b.type = "button"; b.textContent = "Copy post"; b.dataset.copy = id; row.append(b);
+      col.append(a, ta, vis, row); grid.append(col);
+    });
+    box.append(grid); wrap.append(box);
+  });
+  $("socialOut").hidden = false;
+}
+
+// ---------- email ----------
+const FIELDS = ["eSubjects", "ePre", "eHead", "eBody", "eCta", "eUrl", "ePs", "eHero"];
+
+function subjects() {
+  return $("eSubjects").value.split("\n").map((s) => s.replace(/^\s*\d+[.)]\s*/, "").trim()).filter(Boolean);
+}
+
+function buildEmailHtml() {
+  const b = state.brand || {};
+  const color = b.color || "#191a2e", accent = b.accent || "#c9a84c", btnText = b.buttonText || "#191a2e";
+  const head = b.headingFont || "Arial, Helvetica, sans-serif";
+  const font = b.bodyFont || "Arial, Helvetica, sans-serif";
+  const hero = /^https:\/\//i.test($("eHero").value.trim()) ? $("eHero").value.trim() : "";
+  const unsubLabel = $("language").value === "Spanish" ? "Cancelar suscripción" : "Unsubscribe";
+  const lang = $("language").value === "Spanish" ? "es" : "en";
+  const link = /^https?:\/\//i.test($("eUrl").value.trim()) ? $("eUrl").value.trim() : "#";
+  const paras = $("eBody").value.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean)
+    .map((p) => `<p style="margin:0 0 18px;font-family:${font};font-size:18px;line-height:1.5;color:#2b2b2b;">${esc(p).replace(/\n/g, "<br>")}</p>`).join("\n");
+  // With a logo: white header so dark logos stay readable, plus a brand-color bar. Without: brand-color header with the name.
+  const headerRow = b.logo
+    ? `<tr><td style="background:#ffffff;padding:20px 32px;border-radius:8px 8px 0 0;"><img src="${esc(b.logo)}" alt="${esc(b.name)}" height="48" style="display:block;height:48px;width:auto;max-width:240px;border:0;"></td></tr>
+<tr><td style="background:${color};height:6px;line-height:6px;font-size:6px;">&nbsp;</td></tr>`
+    : `<tr><td style="background:${color};padding:20px 32px;border-radius:8px 8px 0 0;"><span style="font-family:${head};font-size:20px;font-weight:bold;color:#ffffff;">${esc(b.name)}</span></td></tr>`;
+  const ps = $("ePs").value.trim()
+    ? `<p style="margin:0;font-family:${font};font-size:16px;line-height:1.5;color:#55586a;">P.S. ${esc($("ePs").value.trim().replace(/^P\.?S\.?\s*/i, ""))}</p>` : "";
+  return `<!DOCTYPE html>
+<html lang="${lang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<title>${esc(subjects()[0] || "")}</title>
+</head>
+<body style="margin:0;padding:0;background:#f2f3f6;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">${esc($("ePre").value)}&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f2f3f6;">
+<tr><td align="center" style="padding:24px 12px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:8px;">
+${headerRow}
+${hero ? `<tr><td style="padding:0;"><img src="${esc(hero)}" width="600" alt="${esc($("eHead").value)}" style="display:block;width:100%;max-width:600px;height:auto;border:0;"></td></tr>` : ""}
+<tr><td style="padding:32px;">
+<h1 style="margin:0 0 20px;font-family:${head};font-size:28px;line-height:1.25;font-weight:bold;color:${color};">${esc($("eHead").value)}</h1>
+${paras}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 28px;"><tr>
+<td style="border-radius:6px;background:${accent};"><a href="${esc(link)}" target="_blank" style="display:inline-block;padding:14px 28px;font-family:${font};font-size:18px;font-weight:bold;color:${btnText};text-decoration:none;border-radius:6px;">${esc($("eCta").value)}</a></td>
+</tr></table>
+${ps}
+</td></tr>
+<tr><td style="padding:20px 32px;border-top:1px solid #e5e6eb;font-family:${font};font-size:16px;line-height:1.5;color:#6b6e80;">${esc(b.name)}${b.footer ? "<br>" + esc(b.footer).replace(/\n/g, "<br>") : ""}${b.unsubscribe ? `<br><a href="${esc(b.unsubscribe)}" style="color:#6b6e80;text-decoration:underline;">${unsubLabel}</a>` : "<!-- Add the unsubscribe link from your sending platform here -->"}</td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
+}
+
+let previewTimer;
+function refreshPreview() {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => { $("preview").srcdoc = buildEmailHtml(); }, 250);
+}
+FIELDS.forEach((id) => $(id).addEventListener("input", refreshPreview));
+
+function fillEmail(m) {
+  state.brand = m.brand;
+  $("eSubjects").value = (m.subject_lines || []).join("\n");
+  $("ePre").value = m.preheader || "";
+  $("eHead").value = m.headline || "";
+  $("eBody").value = m.body || "";
+  $("eCta").value = m.cta_text || "";
+  $("eUrl").value = m.cta_url || "";
+  $("ePs").value = m.ps || "";
+  $("eHero").value = "";
+  $("profileNote").textContent = m.profileNote || "";
+  $("preview").srcdoc = buildEmailHtml();
+  $("emailOut").hidden = false;
+}
+
+$("copyHtml").addEventListener("click", async (e) => {
+  try { await navigator.clipboard.writeText(buildEmailHtml()); flash(e.target, "Copied"); } catch { flash(e.target, "Copy failed"); }
+});
+$("dlHtml").addEventListener("click", () => {
+  const blob = new Blob([buildEmailHtml()], { type: "text/html" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = `${(state.brand?.name || "promo").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-email.html`;
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+
+// ---------- segment ----------
+function composeSegment(s) {
+  const one = (x) => `${x.name}${x.exists === false ? " (new, needs to be built)" : ""}\nWho: ${x.who}\nWhy: ${x.why}`;
+  const parts = [];
+  if (s.primary) parts.push("Send to:\n" + one(s.primary));
+  if (s.secondary && s.secondary.length) parts.push("Also consider:\n" + s.secondary.map(one).join("\n\n"));
+  if (s.exclude && s.exclude.filter(Boolean).length) parts.push("Exclude:\n" + s.exclude.filter(Boolean).map((x) => `- ${x}`).join("\n"));
+  if (s.timing) parts.push(`Timing: ${s.timing}`);
+  return parts.join("\n\n");
+}
+
+// ---------- send ----------
+function packageSections() {
+  const sections = [{
+    heading: "Source",
+    items: [state.content.fromTopic
+      ? `Started from a topic (no source page): ${state.content.title}\nButton link: ${$("eUrl").value || "none"}\nFacts came only from the client's Project docs. Check anything marked [ADD: ...] and fill it in before posting.`
+      : [state.content.title, state.content.url].filter(Boolean).join("\n")],
+  }];
+  document.querySelectorAll("#posts .platform").forEach((box) => {
+    const items = [...box.querySelectorAll(".variant")].map((v) =>
+      [v.querySelector(".angle").textContent, v.querySelector("textarea").value, v.querySelector(".visual").textContent].filter(Boolean).join("\n\n"));
+    if (items.length) sections.push({ heading: `Social: ${box.querySelector("h3").textContent}`, items });
+  });
+  sections.push({
+    heading: "Promo email",
+    items: [
+      "Subject line options:\n" + subjects().map((s, i) => `${i + 1}. ${s}`).join("\n") + `\n\nPreheader: ${$("ePre").value}`,
+      "The full HTML email is attached, ready to paste into the email platform.",
+    ],
+  });
+  sections.push({ heading: "Suggested segment", items: [$("segmentText").value] });
+  return sections;
+}
+
+function packageText() {
+  const lines = [`Promo package for ${$("client").selectedOptions[0].textContent}. Help me refine it.`];
+  packageSections().forEach((sec) => {
+    if (sec.heading === "Promo email") {
+      lines.push("== Promo email ==\n\n" + [
+        "Subject line options:\n" + subjects().map((x, i) => `${i + 1}. ${x}`).join("\n"),
+        `Preheader: ${$("ePre").value}`, `Headline: ${$("eHead").value}`, $("eBody").value,
+        `Button: ${$("eCta").value} (${$("eUrl").value})`, $("ePs").value ? `P.S. ${$("ePs").value}` : "",
+      ].filter(Boolean).join("\n\n"));
+    } else {
+      lines.push(`== ${sec.heading} ==\n\n${sec.items.join("\n\n---\n\n")}`);
+    }
+  });
+  return lines.join("\n\n");
+}
+
+async function refineInClaude(e) {
+  const url = PROJECTS[state.client];
+  try { await navigator.clipboard.writeText(packageText()); } catch {}
+  if (url) { window.open(url, "_blank", "noopener"); flash(e.target, "Copied, paste it in the Project"); }
+  else flash(e.target, "Copied (no Project for this client)");
+}
+
+async function sendToRodri() {
+  const btn = $("sendBtn"); btn.disabled = true;
+  $("sendWarn").innerHTML = ""; $("sendStatus").textContent = "";
+  mark("notify", "running", "Sending");
+  try {
+    const r = await call("notify", {
+      taskId: linkedTaskId, by: hubGet(HUB.me),
+      client: state.client, title: state.content.title, url: state.content.url,
+      sections: packageSections(), cc: $("cc").value, emailHtml: buildEmailHtml(),
+      meta: {
+        platforms: state.platforms.join(", "),
+        subject: subjects()[0] || "",
+        segment: state.segment?.primary?.name || "",
+        fromTopic: !!state.content.fromTopic,
+      },
+    });
+    const bits = [];
+    if (r.emailed) bits.push("Emailed Rodri" + (r.copied && r.copied.length ? ` (copied ${r.copied.join(", ")})` : ""));
+    if (r.logged) bits.push("Logged in sheet");
+    if (r.slack) bits.push("Slack posted");
+    mark("notify", r.emailed ? "done" : "failed", bits.join(", ") || "Not sent");
+    if (bits.length) { const s = document.createElement("span"); s.className = "ok"; s.textContent = bits.join(", ") + "."; $("sendStatus").append(s); }
+    if (r.task) {
+      // Sending again updates this same task instead of creating another one
+      linkedTaskId = r.task.taskId;
+      const s = document.createElement("span"); s.className = "ok";
+      s.innerHTML = ` ${r.task.created ? "Created" : "Updated"} task <a href="${esc(r.task.url)}" target="_blank" rel="noopener">${esc(r.task.taskId)}</a> in the Task Hub.` +
+        (r.task.packageUrl ? ` <a href="${esc(r.task.packageUrl)}" target="_blank" rel="noopener">Open the saved package</a>.` : "");
+      $("sendStatus").append(s);
+    }
+    (r.warnings || []).forEach((w) => { const d = document.createElement("div"); d.className = "warn"; d.textContent = w; $("sendWarn").append(d); });
+    btn.textContent = "Send again";
+  } catch (err) {
+    mark("notify", "failed", "Failed");
+    const d = document.createElement("div"); d.className = "warn"; d.textContent = err.message; $("sendWarn").append(d);
+  } finally { btn.disabled = false; }
+}
+
+// ---------- run ----------
+const mode = () => document.querySelector('input[name="mode"]:checked').value;
+function applyMode() {
+  const m = mode();
+  $("contentFields").hidden = m !== "content";
+  $("topicFields").hidden = m !== "topic";
+  $("ideaFields").hidden = m !== "ideas";
+  $("goalField").hidden = m === "ideas";
+  $("promoOnly").hidden = m === "ideas";
+  $("rail").hidden = m === "ideas";
+  $("run").textContent = m === "ideas" ? "Get ideas" : "Build promo package";
+}
+document.querySelectorAll('input[name="mode"]').forEach((r) => r.addEventListener("change", () => {
+  applyMode();
+  $("contentFields").hidden = mode() !== "content";
+  $("topicFields").hidden = mode() !== "topic";
+  $("formError").textContent = "";
+}));
+
+async function run(e) {
+  e.preventDefault();
+  $("formError").textContent = "";
+  const fromTopic = mode() === "topic";
+  const url = $("url").value.trim(), text = $("text").value.trim(), topic = $("topic").value.trim();
+  const platforms = [...document.querySelectorAll("#platforms input:checked")].map((i) => i.value);
+  if (fromTopic && !topic) { $("formError").textContent = "Add a topic."; $("topic").focus(); return; }
+  if (!fromTopic && !url && !text) { $("formError").textContent = "Add a content link or paste the content."; $("url").focus(); return; }
+  if (!platforms.length) { $("formError").textContent = "Pick at least one platform."; return; }
+
+  state = { client: $("client").value, platforms };
+  const base = { client: state.client, goal: $("goal").value.trim(), language: $("language").value };
+  $("docsNote").textContent = "";
+  ["socialOut", "emailOut", "segmentOut", "sendOut"].forEach((id) => ($(id).hidden = true));
+  $("empty").hidden = true; resetRail();
+  $("run").disabled = true; $("run").textContent = "Building…";
+  $("sendBtn").textContent = "Email Rodri";
+
+  let current = "extract";
+  try {
+    mark("extract", "running", "Reading");
+    state.content = await call("extract", fromTopic ? { topic } : { url, text });
+    mark("extract", "running", "Reading client docs");
+    try {
+      const c = await call("context", { client: state.client });
+      state.context = c.context || "";
+      state.site = c.site || null;
+      $("docsNote").textContent = c.sources && c.sources.length
+        ? `Using this client's Project docs: ${c.sources.join(", ")}.`
+        : (c.note || "");
+      if (state.content.fromTopic) {
+        state.content.url = $("topicLink").value.trim() || c.bookingUrl || c.website || "";
+        if (!(c.sources && c.sources.length)) {
+          $("docsNote").textContent += " Heads up: without the client's docs, a topic run has no facts to draw on, so check every detail.";
+        }
+        if (!state.content.url) $("docsNote").textContent += " No button link was found; add one in the email fields.";
+      }
+    } catch (err) {
+      state.context = "";
+      state.site = null;
+      $("docsNote").textContent = `Couldn't read the client's Project docs (${err.message}). Continuing without them.`;
+    }
+    mark("extract", "done", state.content.title.slice(0, 40));
+
+    current = "social"; mark("social", "running", `Writing ${platforms.length} platforms`);
+    const results = await Promise.all(platforms.map((platform) =>
+      call("social", { ...base, content: state.content, platform, context: state.context }).catch((err) => ({ platform, error: err.message }))));
+    state.posts = results.filter((r) => !r.error);
+    renderPosts(results);
+    if (!state.posts.length) throw new Error("None of the social posts came back. Run it again.");
+    mark("social", "done", `${state.posts.length * 2} examples`);
+
+    current = "email"; mark("email", "running", "Writing");
+    fillEmail(await call("email", { ...base, content: state.content, posts: state.posts, context: state.context, site: state.site }));
+    mark("email", "done", "Draft ready");
+
+    current = "segment"; mark("segment", "running", "Choosing");
+    state.segment = await call("segment", { ...base, content: state.content, email: { subject_lines: subjects() }, knownSegments: $("segments").value, context: state.context });
+    $("segmentText").value = composeSegment(state.segment); $("segmentOut").hidden = false;
+    mark("segment", "done", state.segment.primary ? state.segment.primary.name.slice(0, 40) : "Ready");
+
+    $("sendOut").hidden = false;
+    if ($("autoping").checked) await sendToRodri();
+  } catch (err) {
+    mark(current, "failed", "Failed");
+    $("formError").textContent = err.message;
+  } finally {
+    $("run").disabled = false; $("run").textContent = "Build promo package";
+  }
+}
+
+async function loadClients() {
+  let groups = FALLBACK_GROUPS;
+  if (!hubGet(HUB.code)) askForCode();
+  else { try { const r = await call("clients", {}); if (r.groups && r.groups.length) groups = r.groups; $("codeBox").hidden = true; } catch {} }
+  const sel = $("client"); sel.innerHTML = "";
+  groups.forEach((g) => {
+    const og = document.createElement("optgroup"); og.label = g.label;
+    g.clients.forEach((c) => {
+      PROJECTS[c.code] = c.projectUrl || "";
+      const o = document.createElement("option"); o.value = c.code; o.textContent = c.name; og.append(o);
+    });
+    sel.append(og);
+  });
+}
+
+// Opened from a task: tasks.html sends ?client=&url= (or &topic=) &task=&title=
+function prefillFromTask() {
+  const client = params.get("client"), url = params.get("url"), topic = params.get("topic");
+  if (client) {
+    const opt = [...$("client").options].find((o) => o.value.toLowerCase() === client.toLowerCase());
+    if (opt) $("client").value = opt.value;
+  }
+  if (topic && !url) {
+    document.querySelector('input[name="mode"][value="topic"]').checked = true;
+    $("contentFields").hidden = true; $("topicFields").hidden = false;
+    $("topic").value = topic;
+  } else if (url) {
+    $("url").value = url;
+  }
+  if (linkedTaskId) {
+    const title = params.get("title") || "";
+    $("taskNote").hidden = false;
+    $("taskNote").innerHTML = `Promoting for task <a href="/tasks.html#${encodeURIComponent(linkedTaskId)}">${esc(linkedTaskId)}</a>${title ? ` (${esc(title)})` : ""}. When you email Rodri, the package is written back to the Task Hub.`;
+  }
+}
+
+$("codeBtn").addEventListener("click", async () => {
+  const v = $("teamCode").value.trim();
+  if (!v) { $("codeErr").textContent = "Enter the code."; return; }
+  hubSet(HUB.code, v);
+  $("codeErr").textContent = "Checking…";
+  try { await call("clients", {}); $("codeBox").hidden = true; $("codeErr").textContent = ""; await loadClients(); prefillFromTask(); }
+  catch (err) { $("codeErr").textContent = "That code didn't work."; }
+});
+$("teamCode").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("codeBtn").click(); } });
+
+// ---------- content ideas ----------
+(function fillMonths() {
+  const now = new Date();
+  for (let i = 0; i < 4; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const label = d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    const o = document.createElement("option"); o.textContent = label; if (i === 1) o.selected = true;
+    $("ideaMonth").append(o);
+  }
+})();
+
+let ideaState = null;
+
+async function runIdeas() {
+  const platforms = [...document.querySelectorAll("#platforms input:checked")].map((i) => i.value);
+  if (!platforms.length) { $("formError").textContent = "Pick at least one platform."; return; }
+  const client = $("client").value;
+  ["socialOut", "emailOut", "segmentOut", "sendOut"].forEach((id) => ($(id).hidden = true));
+  $("empty").hidden = true; $("ideasOut").hidden = true;
+  $("run").disabled = true; $("run").textContent = "Reading client docs…";
+  $("docsNote").textContent = "";
+  try {
+    let ctx = "";
+    try {
+      const c = await call("context", { client });
+      ctx = c.context || "";
+      $("docsNote").textContent = c.sources && c.sources.length ? `Using this client's Project docs: ${c.sources.join(", ")}.` : (c.note || "");
+    } catch (err) { $("docsNote").textContent = `Client docs weren't read (${err.message}).`; }
+    $("run").textContent = "Thinking up ideas…";
+    const month = $("ideaMonth").value;
+    const r = await call("ideas", { client, month, count: $("ideaCount").value, theme: $("ideaTheme").value.trim(), language: $("language").value, platforms, context: ctx });
+    ideaState = { client, month, ideas: r.ideas || [] };
+    $("ideasNote").textContent = (r.pillarsSource === "profile"
+      ? `Spread across this client's pillars: ${(r.pillars || []).join(", ")}.`
+      : `No pillars on file for this client, so these were inferred from the docs: ${(r.pillars || []).join(", ")}. Add them to the Content pillars column in Client Profiles to keep them consistent.`) +
+      " Untick any you don't want, edit titles if you like, then add them to the backlog.";
+    renderIdeas();
+    $("ideasOut").hidden = false;
+  } catch (err) {
+    $("formError").textContent = err.message;
+  } finally {
+    $("run").disabled = false; $("run").textContent = "Get ideas";
+  }
+}
+
+function renderIdeas() {
+  $("addIdeasStatus").textContent = "";
+  $("addIdeasBtn").disabled = false;
+  $("ideaList").innerHTML = ideaState.ideas.map((i, n) => `
+    <div class="idea">
+      <input type="checkbox" id="ic${n}" checked aria-label="Use this idea">
+      <div>
+        <input type="text" class="ititle" id="it${n}" value="${esc(i.title)}" aria-label="Idea title">
+        <p class="imeta">${esc([i.pillar, i.format].filter(Boolean).join(" · "))}</p>
+        <p class="iangle">${esc(i.angle || "")}</p>
+        ${i.visual ? `<p class="ivisual">Visual: ${esc(i.visual)}</p>` : ""}
+      </div>
+      <div class="irow"><button type="button" data-write="${n}">Write this one now</button></div>
+    </div>`).join("");
+  $("ideaList").querySelectorAll("[data-write]").forEach((b) => b.addEventListener("click", () => {
+    const n = +b.dataset.write, i = ideaState.ideas[n];
+    document.querySelector('input[name="mode"][value="topic"]').checked = true;
+    applyMode();
+    $("topic").value = [$("it" + n).value.trim(), i.angle].filter(Boolean).join(". ");
+    $("ideasOut").hidden = true;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    $("topic").focus();
+  }));
+}
+
+$("addIdeasBtn").addEventListener("click", async () => {
+  if (!ideaState) return;
+  const picked = ideaState.ideas.map((i, n) => ({ ...i, title: $("it" + n).value.trim() })).filter((_, n) => $("ic" + n).checked);
+  if (!picked.length) { $("addIdeasStatus").textContent = "Tick at least one idea."; return; }
+  $("addIdeasBtn").disabled = true;
+  $("addIdeasStatus").textContent = "Adding…";
+  try {
+    const r = await call("addIdeas", { client: ideaState.client, month: ideaState.month, ideas: picked, by: hubGet(HUB.me) });
+    $("addIdeasStatus").className = "ok";
+    $("addIdeasStatus").innerHTML = `Added ${r.added.length} ${r.added.length === 1 ? "idea" : "ideas"} to the backlog (${r.added.map((t) => `<a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.taskId)}</a>`).join(", ")}).`;
+  } catch (err) {
+    $("addIdeasBtn").disabled = false;
+    $("addIdeasStatus").className = "error";
+    $("addIdeasStatus").textContent = err.message;
+  }
+});
+
+$("f").addEventListener("submit", (e) => {
+  if (mode() === "ideas") { e.preventDefault(); $("formError").textContent = ""; return runIdeas(); }
+  return run(e);
+});
+$("sendBtn").addEventListener("click", sendToRodri);
+$("refineBtn").addEventListener("click", refineInClaude);
+["url", "text"].forEach((id) => $(id).addEventListener("input", () => ($("formError").textContent = "")));
+loadClients().then(prefillFromTask);
+</script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Promo sequence · OverCoffee</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #191a2e; --gold: #c9a84c;
+    --bg: #f3f4f7; --surface: #ffffff; --ink: #191a2e; --muted: #555872; --line: #d8dae3;
+    --accent: #8a6d1f; --accent-soft: #f6efdb; --danger: #a12d2d; --danger-soft: #fbeaea; --ok: #2f6b3a;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11121d; --surface: #1b1c2c; --ink: #ecebe6; --muted: #a6a8bb; --line: #33354b;
+      --accent: #d9bb6a; --accent-soft: #2c2918; --danger: #f09a9a; --danger-soft: #3a1d1f; --ok: #8fd19a;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 400 1rem/1.5 "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { background: var(--navy); color: #f3f1ea; padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  header h1 { margin: 0; font-size: 1.25rem; font-weight: 600; }
+  header h1 span { color: var(--gold); }
+  header a { color: #f3f1ea; }
+  .wrap { display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: 1.5rem; padding: 1.5rem; max-width: 1360px; margin: 0 auto; }
+  @media (max-width: 960px) { .wrap { grid-template-columns: 1fr; } }
+  form, .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 1.25rem; min-width: 0; }
+  form { align-self: start; position: sticky; top: 1rem; }
+  @media (max-width: 960px) { form { position: static; } }
+  label, legend { display: block; font-weight: 500; margin: 1rem 0 .35rem; }
+  form > label:first-child { margin-top: 0; }
+  .hint { color: var(--muted); font-size: .875rem; margin: 0 0 .35rem; }
+  input[type=text], input[type=url], select, textarea {
+    width: 100%; padding: .6rem .7rem; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--bg); color: var(--ink); font: inherit;
+  }
+  textarea { resize: vertical; min-height: 5rem; }
+  fieldset { border: 0; padding: 0; margin: 0; }
+  .checks { display: flex; flex-wrap: wrap; gap: .4rem; }
+  .checks label { margin: 0; font-weight: 400; display: inline-flex; align-items: center; gap: .35rem; padding: .35rem .65rem; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; }
+  .checks label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+  .inline { display: flex; align-items: center; gap: .5rem; font-weight: 400; }
+  button { font: inherit; font-weight: 500; border-radius: 8px; cursor: pointer; padding: .55rem .9rem; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+  button.primary { width: 100%; margin-top: 1.25rem; padding: .7rem 1rem; background: var(--navy); color: #fff; border-color: var(--navy); }
+  @media (prefers-color-scheme: dark) { button.primary { background: var(--gold); color: #191a2e; border-color: var(--gold); } }
+  button:disabled { opacity: .55; cursor: wait; }
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .error { color: var(--danger); font-size: .9rem; margin: .5rem 0 0; min-height: 1.2em; }
+
+  ol.rail { list-style: none; margin: 0 0 1.5rem; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: .5rem; counter-reset: s; }
+  @media (max-width: 640px) { ol.rail { grid-template-columns: 1fr; } }
+  ol.rail li { counter-increment: s; border-top: 4px solid var(--line); padding-top: .5rem; color: var(--muted); font-size: .95rem; }
+  ol.rail li::before { content: counter(s) " "; font-weight: 600; }
+  ol.rail li.running { border-top-color: var(--gold); color: var(--ink); }
+  ol.rail li.done { border-top-color: var(--navy); color: var(--ink); }
+  @media (prefers-color-scheme: dark) { ol.rail li.done { border-top-color: var(--accent); } }
+  ol.rail li.failed { border-top-color: var(--danger); color: var(--danger); }
+  ol.rail small { display: block; font-size: .8rem; color: var(--muted); }
+
+  .empty { color: var(--muted); padding: 2rem 0; max-width: 60ch; }
+  section.out { margin-bottom: 2rem; }
+  section.out > h2 { font-size: 1.15rem; font-weight: 600; margin: 0 0 .75rem; }
+  .platform { border: 1px solid var(--line); border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+  .platform h3 { margin: 0 0 .75rem; font-size: 1rem; font-weight: 600; }
+  .variants { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; }
+  .variant { display: flex; flex-direction: column; gap: .4rem; }
+  .variant .angle { font-size: .875rem; font-weight: 500; color: var(--accent); }
+  .variant textarea { min-height: 11rem; background: var(--surface); }
+  .variant .visual { font-size: .875rem; color: var(--muted); margin: 0; }
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 1rem; }
+  .card textarea { background: var(--surface); }
+  .emailgrid { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(300px, 1.2fr); gap: 1rem; }
+  @media (max-width: 1100px) { .emailgrid { grid-template-columns: 1fr; } }
+  .emailgrid label { margin-top: .75rem; }
+  .emailgrid label:first-child { margin-top: 0; }
+  .emailgrid input, .emailgrid textarea { background: var(--surface); }
+  iframe.preview { width: 100%; height: 680px; border: 1px solid var(--line); border-radius: 8px; background: #f2f3f6; }
+  .row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-top: .5rem; }
+  .send { border-top: 1px solid var(--line); padding-top: 1.25rem; }
+  .warn { background: var(--danger-soft); color: var(--danger); border-radius: 8px; padding: .6rem .8rem; font-size: .9rem; margin-top: .75rem; }
+  .ok { color: var(--ok); }
   .tasknote { border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; padding: .7rem .9rem; margin-bottom: 1rem; font-size: .95rem; }
   .tasknote a, .ok a { color: var(--accent); }
   .codebox { border: 1px solid var(--line); border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
