@@ -949,7 +949,72 @@ async function notify({ client, title, url, sections, cc, emailHtml, meta = {}, 
 
 // ---------- handler ----------
 
-const STEPS = { clients, extract, context, social, email, segment, notify };
+// ---------- content ideas for the calendar ----------
+// Pillars come from a "Content pillars" column in Client Profiles (one per line, or separated by ;).
+// Ideas are spread evenly across them and avoid titles this client already has in the Task Hub.
+
+const splitPillars = (v) => String(v || "").split(/\n|;/).map((s) => s.replace(/^[-•*\d.)\s]+/, "").trim()).filter(Boolean).slice(0, 12);
+
+async function ideas({ client, month, count, theme, language, platforms, context }) {
+  const prof = await profileFor(client);
+  const pillars = splitPillars(prof.p["content pillars"]);
+  const n = Math.min(Math.max(parseInt(count, 10) || 10, 4), 15);
+  const where = (platforms && platforms.length ? platforms : ["Instagram", "Facebook"]).join(" and ");
+
+  let recent = [];
+  try {
+    const { tasks: all } = await tasks.loadAll();
+    recent = all
+      .filter((t) => tasks.same(t.client, client) && ["SOCIAL", "PROMO", "CONTENT"].includes(t.type))
+      .slice(-40)
+      .map((t) => t.title.replace(/^Promo:\s*/i, ""));
+  } catch (_) {}
+
+  const system =
+    "You are OverCoffee Consulting's social content strategist. You plan varied, on-brand post ideas that a small team can actually produce. You never invent facts, prices, dates, offers, events or statistics that aren't in the client docs.";
+  const user = `${clientBlock(prof, "social", context)}
+${languageLine(language)}
+Month: ${month || "next month"}. Platforms: ${where}.
+${theme ? `Theme to weave in where it fits (not every idea): ${theme}\n` : ""}${pillars.length
+    ? `CONTENT PILLARS for this client (use exactly these names):\n${pillars.map((x) => `- ${x}`).join("\n")}\nSpread the ideas as evenly as you can across these pillars.`
+    : "This client has no pillars on file. Infer 4 or 5 content pillars from the client docs, name them briefly, and spread the ideas evenly across them."}
+${recent.length ? `\nAlready planned or posted recently (don't repeat these or near-duplicates):\n${recent.map((t) => `- ${t}`).join("\n")}\n` : ""}
+Give ${n} post ideas. Vary them inside each pillar: mix formats (carousel, reel, single image, story) and angles (educational, behind the scenes, social proof, offer, community, seasonal). Use seasonal moments in ${month || "the month"} only when they fit the client. Each title is a short working title the team can schedule, not a caption. If an idea needs a detail the docs don't give (a date, a price, a name), mark it like [ADD: event date] instead of making it up.
+
+JSON shape:
+{"pillars":["pillar name"],"ideas":[{"title":"","pillar":"","format":"Carousel|Reel|Single image|Story","angle":"one sentence on what the post says and why it works","visual":"one-line visual idea using what the client likely has"}]}`;
+  const out = await claudeJSON(system, user, 2200);
+  out.ideas = (out.ideas || []).slice(0, n);
+  out.pillarsSource = pillars.length ? "profile" : "inferred";
+  return out;
+}
+
+// Ticked ideas become SOCIAL tasks in the Backlog, owned by Rodri, one sheet write, no emails.
+async function addIdeas({ client, ideas: list, month, by }) {
+  const env = process.env;
+  const rodri = teamMembers().find((m) => env.RODRI_EMAIL && tasks.same(m.email, env.RODRI_EMAIL))?.name || "Rodri";
+  const items = (list || []).filter((i) => i && String(i.title || "").trim()).slice(0, 20);
+  if (!items.length) return { error: "Tick at least one idea to add." };
+  const r = await tasks.createMany(items.map((i) => ({
+    client,
+    title: String(i.title).trim().slice(0, 200),
+    type: "SOCIAL",
+    status: "Backlog",
+    owner: rodri,
+    reviewer: "Paola",
+    brief: [
+      i.pillar ? `Pillar: ${i.pillar}` : "",
+      i.format ? `Format: ${i.format}` : "",
+      i.angle ? `Angle: ${i.angle}` : "",
+      i.visual ? `Visual: ${i.visual}` : "",
+      month ? `Idea for ${month}.` : "",
+    ].filter(Boolean).join("\n"),
+  })), by || "Promo tool");
+  if (r.code !== 200) return { error: r.error };
+  return { added: r.tasks.map((t) => ({ taskId: t.taskId, title: t.title, url: tasks.taskLink(t.taskId) })) };
+}
+
+const STEPS = { clients, extract, context, social, email, segment, notify, ideas, addIdeas };
 
 exports.handler = async (event) => {
   if (event.httpMethod !== "POST") return json(405, { error: "Use POST." });
