@@ -7,7 +7,7 @@
 //   Requested by   who asked for the work; emailed when it's Published and when it's Closed
 
 const { teamMembers } = require("./auth");
-const { readTab, writeRow, appendRow } = require("./google");
+const { readTab, writeRow, appendRow, appendRows } = require("./google");
 const { emailReady, sendEmail } = require("./email");
 
 const STATUSES = ["Backlog", "To do", "In progress", "Needs review", "Changes requested", "Scheduled", "Published", "Closed"];
@@ -256,6 +256,30 @@ async function createTask(input, by, { notify = true } = {}) {
   return { code: 200, task, ...mail };
 }
 
+// Several tasks at once (one sheet read, one write), with consecutive Task IDs. No emails.
+async function createMany(inputs, by) {
+  by = String(by || "").trim() || "Someone";
+  const { keys, rows, tasks } = await loadAll();
+  const idCol = keys.indexOf("taskId");
+  let max = Math.max(0, ...tasks.map((t) => parseInt(String(t.taskId).replace(/\D/g, ""), 10) || 0), ...rows.map((r) => parseInt(String(r[idCol] || "").replace(/\D/g, ""), 10) || 0));
+  const now = new Date().toISOString();
+  const made = [];
+  for (const input of inputs) {
+    const t = { taskId: `T-${String(++max).padStart(4, "0")}`, created: now.slice(0, 10), statusSince: now.slice(0, 10), updatedBy: by, updatedAt: now };
+    for (const k of EDITABLE) t[k] = cleanValue(k, (input || {})[k]);
+    t.status = t.status || "Backlog";
+    t.priority = t.priority || "Normal";
+    if (!t.requestedBy) t.requestedBy = by;
+    for (const k of ["waitingOn", "requestedBy"]) if (!keys.includes(k)) t[k] = "";
+    const err = problem(t);
+    if (err) return { code: 400, error: `"${t.title || "Untitled"}": ${err}` };
+    made.push(t);
+  }
+  if (!made.length) return { code: 400, error: "Nothing to add." };
+  await appendRows(TAB(), made.map((t) => lineFor(keys, null, t)));
+  return { code: 200, tasks: made.map((t, i) => tidy({ ...t, row: rows.length + 2 + i })) };
+}
+
 // force: skip the "someone else saved it" check (used by tools that change only their own fields)
 async function updateTask(taskId, changes, by, { expectedUpdatedAt = "", force = false, notify = true } = {}) {
   by = String(by || "").trim() || "Someone";
@@ -294,5 +318,5 @@ async function updateTask(taskId, changes, by, { expectedUpdatedAt = "", force =
 
 module.exports = {
   STATUSES, TYPES, PRIORITIES, RESULTS, PROMOTABLE,
-  loadAll, createTask, updateTask, taskLink, same,
+  loadAll, createTask, createMany, updateTask, taskLink, same,
 };
