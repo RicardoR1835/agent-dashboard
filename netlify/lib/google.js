@@ -100,6 +100,16 @@ async function writeRow(tab, rowNumber, values) {
   return call(sheetUrl(encodeURIComponent(range)) + "?valueInputOption=RAW", { method: "PUT", body: JSON.stringify({ values: [values] }) }, tab);
 }
 
+// Adds several rows after the last row with data, in one call.
+async function appendRows(tab, rows) {
+  const range = `${quoteTab(tab)}!A1`;
+  return call(
+    sheetUrl(encodeURIComponent(range)) + ":append?valueInputOption=RAW&insertDataOption=INSERT_ROWS",
+    { method: "POST", body: JSON.stringify({ values: rows }) },
+    tab
+  );
+}
+
 // Adds a row after the last row with data.
 async function appendRow(tab, values) {
   const range = `${quoteTab(tab)}!A1`;
@@ -131,4 +141,4 @@ async function ensureTab(tab, header) {
   return true;
 }
 
-module.exports = { googleReady, googleToken, privateKey, readTab, writeRow, appendRow, ensureTab };
+module.exports = { googleReady, googleToken, privateKey, readTab, writeRow, appendRow, appendRows, ensureTab };
