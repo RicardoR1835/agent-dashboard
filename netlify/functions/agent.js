@@ -1,6 +1,14 @@
+// Private: only runs with the admin code (ADMIN_ACCESS_CODE in Netlify), sent by agent.html.
+const { checkAdmin } = require("../lib/auth");
+
 exports.handler = async (event) => {
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: "Method not allowed" };
+  }
+
+  const denied = await checkAdmin(event);
+  if (denied) {
+    return { statusCode: denied.statusCode, headers: { "content-type": "application/json" }, body: JSON.stringify({ error: denied.error }) };
   }
 
   const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
