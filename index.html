@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<meta name="robots" content="noindex">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OverCoffee — Agent Dashboard</title>
@@ -183,6 +184,20 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 </div>
 
 <script>
+// ── ADMIN CODE ───────────────────────────────────────────────────────────────
+// This page is private (Ricardo only). agent.js refuses to run without the admin code,
+// which lives in the ADMIN_ACCESS_CODE environment variable in Netlify, never in this file.
+const ADMIN_KEY = "occAdmin.code";
+function adminCode() {
+  let c = "";
+  try { c = localStorage.getItem(ADMIN_KEY) || ""; } catch (_) {}
+  if (!c) {
+    c = (prompt("Admin code for the agent dashboard") || "").trim();
+    try { if (c) localStorage.setItem(ADMIN_KEY, c); } catch (_) {}
+  }
+  return c;
+}
+
 // ── CLIENT → CLAUDE PROJECT MAPPING ─────────────────────────────────────────
 const CLIENT_PROJECTS = {
   "TCC":       { id: "019d7d60-d2df-719a-aea4-93eb0d506f52", label: "TCC Project" },
@@ -293,12 +308,13 @@ async function runTask(id) {
   try {
     const res = await fetch(AGENT_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-admin-code": adminCode() },
       body: JSON.stringify(task)
     });
     clearInterval(iv);
     if (pb) pb.style.width = '100%';
     const data = await res.json();
+    if (res.status === 401) { try { localStorage.removeItem(ADMIN_KEY); } catch (_) {} }
     if (!res.ok || data.error) { errors[id] = data.error || `HTTP ${res.status}`; }
     else { outputs[id] = fmt(data.output); done.add(id); }
   } catch(err) {
