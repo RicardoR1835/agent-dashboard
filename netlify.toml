@@ -8,3 +8,9 @@
 # so exactly one of these runs sends, whether or not daylight saving time is on.
 [functions."digest"]
   schedule = "0 13,14 * * 1"
+
+# The team's home page is the Task Hub. The agent dashboard lives at /agent.html (admin code only).
+[[redirects]]
+  from = "/"
+  to = "/tasks.html"
+  status = 302
