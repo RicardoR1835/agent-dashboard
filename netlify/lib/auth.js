@@ -30,6 +30,19 @@ async function checkAccess(event) {
   return null;
 }
 
+// Admin-only tools (the agent dashboard). Separate code: ADMIN_ACCESS_CODE, header x-admin-code.
+async function checkAdmin(event) {
+  const expected = process.env.ADMIN_ACCESS_CODE;
+  if (!expected) return { statusCode: 500, error: "ADMIN_ACCESS_CODE isn't set in Netlify yet." };
+  const headers = event.headers || {};
+  const given = headers["x-admin-code"] || headers["X-Admin-Code"] || "";
+  if (!given || !crypto.timingSafeEqual(sha(given.trim()), sha(expected.trim()))) {
+    await sleep(600);
+    return { statusCode: 401, error: "That admin code didn't work. Reload the page to enter it again." };
+  }
+  return null;
+}
+
 // [{ name, email }] from TEAM_MEMBERS. Emails outside the company domain are dropped.
 function teamMembers() {
   return String(process.env.TEAM_MEMBERS || "")
@@ -42,4 +55,4 @@ function teamMembers() {
     .filter(Boolean);
 }
 
-module.exports = { checkAccess, teamMembers, ALLOWED_EMAIL_DOMAIN };
+module.exports = { checkAccess, checkAdmin, teamMembers, ALLOWED_EMAIL_DOMAIN };
